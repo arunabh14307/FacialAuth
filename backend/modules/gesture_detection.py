@@ -29,24 +29,30 @@ except Exception as e:
     HAS_MEDIAPIPE = False
     print(f"[WARN] MediaPipe / OpenCV import error in gesture_detection: {e}")
 
-# Initialize FaceLandmarker
-detector = None
-if HAS_MEDIAPIPE and python is not None:
-    try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        model_path = os.path.join(base_dir, 'face_landmarker.task')
+# Lazy initialization of FaceLandmarker
+_detector = None
 
-        base_options = python.BaseOptions(model_asset_path=model_path)
-        options = vision.FaceLandmarkerOptions(
-            base_options=base_options,
-            output_face_blendshapes=True,
-            output_facial_transformation_matrixes=True,
-            num_faces=1)
+def _get_detector():
+    global _detector
+    if not HAS_MEDIAPIPE or python is None or vision is None:
+        return None
+    if _detector is None:
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            model_path = os.path.join(base_dir, 'face_landmarker.task')
 
-        detector = vision.FaceLandmarker.create_from_options(options)
-    except Exception as e:
-        print(f"Error loading FaceLandmarker: {e}")
-        detector = None
+            base_options = python.BaseOptions(model_asset_path=model_path)
+            options = vision.FaceLandmarkerOptions(
+                base_options=base_options,
+                output_face_blendshapes=True,
+                output_facial_transformation_matrixes=True,
+                num_faces=1)
+
+            _detector = vision.FaceLandmarker.create_from_options(options)
+        except Exception as e:
+            print(f"Error loading FaceLandmarker: {e}")
+            _detector = None
+    return _detector
 
 # MediaPipe face mesh landmarks map exactly as before
 NOSE_TIP = 1
@@ -102,6 +108,7 @@ def _detect_head_direction(landmarks):
     return results
 
 def detect_gesture(frame, target_gesture):
+    detector = _get_detector()
     if frame is None or detector is None:
         return False, 0.0, "Invalid image data or model not loaded"
 
