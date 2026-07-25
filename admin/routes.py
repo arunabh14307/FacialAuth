@@ -56,7 +56,7 @@ def admin_login():
         admin = db.verify_admin(username, password)
 
         if admin:
-            admin_email = admin.get('email') or current_app.config.get('DEFAULT_ADMIN_EMAIL', 'admin@faceguard.local')
+            admin_email = current_app.config.get('DEFAULT_ADMIN_EMAIL') or admin.get('email') or 'arunabhsingh10@gmail.com'
             otp_code = generate_otp(6)
 
             session['pending_admin_otp'] = {
@@ -105,7 +105,7 @@ def verify_credentials():
     if not admin:
         return jsonify({'success': False, 'message': 'Invalid admin credentials.'}), 401
 
-    admin_email = admin.get('email') or current_app.config.get('DEFAULT_ADMIN_EMAIL', 'admin@faceguard.local')
+    admin_email = current_app.config.get('DEFAULT_ADMIN_EMAIL') or admin.get('email') or 'arunabhsingh10@gmail.com'
     otp_code = generate_otp(6)
 
     # Store pending OTP in session
