@@ -57,8 +57,12 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
                 "Authorization": f"Bearer {resend_key.strip()}",
                 "Content-Type": "application/json"
             }
+            sender = config.get('MAIL_FROM_ADDRESS') or 'onboarding@resend.dev'
+            if 'gmail.com' in sender or 'faceguard.local' in sender or not '@' in sender:
+                sender = 'onboarding@resend.dev'
+
             payload = {
-                "from": config.get('MAIL_FROM_ADDRESS', 'onboarding@resend.dev'),
+                "from": f"FaceGuard Security <{sender}>" if '<' not in sender else sender,
                 "to": [recipient_email],
                 "subject": subject,
                 "text": body
