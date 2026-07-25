@@ -20,6 +20,7 @@ def create_app():
     app.config['MAX_CONTENT_LENGTH'] = Config.MAX_CONTENT_LENGTH
     app.config['FACE_ENCODING_DIR'] = Config.FACE_ENCODING_DIR
     app.config['FACE_RECOGNITION_TOLERANCE'] = Config.FACE_RECOGNITION_TOLERANCE
+    app.url_map.strict_slashes = False
 
     # Initialize database with fallback for read-only serverless environments (Vercel)
     db_path = app.config.get('DATABASE_PATH', Config.DATABASE_PATH)
