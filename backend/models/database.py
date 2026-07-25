@@ -89,17 +89,17 @@ class Database:
         from backend.config import Config
         from werkzeug.security import generate_password_hash
         
-        # Ensure nightmare & admin accounts are seeded and synced with active email
+        # Ensure nightmare & admin accounts are seeded and synced with active email & password
+        pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
         for uname in ['nightmare', 'admin']:
             cursor.execute("SELECT COUNT(*) FROM admins WHERE LOWER(username) = LOWER(?)", (uname,))
             if cursor.fetchone()[0] == 0:
-                pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
                 cursor.execute(
                     'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
                     (uname, pwd_hash, 'arunabhsingh10@gmail.com')
                 )
             else:
-                cursor.execute("UPDATE admins SET email = ? WHERE LOWER(username) = LOWER(?)", ('arunabhsingh10@gmail.com', uname))
+                cursor.execute("UPDATE admins SET email = ?, password_hash = ? WHERE LOWER(username) = LOWER(?)", ('arunabhsingh10@gmail.com', pwd_hash, uname))
 
         # Ensure active SMTP credentials in database settings
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_SERVER', ?)", ('smtp.gmail.com',))
