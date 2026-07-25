@@ -23,9 +23,9 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
     # Strategy A: Brevo HTTP API
     if brevo_key:
         try:
-            sender_email = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or 'arun12507086@gmail.com'
+            sender_email = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or 'arunabhsingh10@gmail.com'
             if 'faceguard.local' in sender_email or not '@' in sender_email:
-                sender_email = 'arun12507086@gmail.com'
+                sender_email = 'arunabhsingh10@gmail.com'
 
             url = "https://api.brevo.com/v3/smtp/email"
             headers = {
