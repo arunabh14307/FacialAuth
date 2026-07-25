@@ -61,8 +61,8 @@ FACE_BOTTOM = 152
 FACE_LEFT = 234
 FACE_RIGHT = 454
 
-HEAD_TURN_THRESHOLD = 0.05
-HEAD_TILT_THRESHOLD = 0.03
+HEAD_TURN_THRESHOLD = 0.04
+HEAD_TILT_THRESHOLD = 0.025
 
 SUPPORTED_GESTURES = ['smile', 'blink', 'look_left', 'look_right', 'look_up', 'look_down']
 
@@ -107,6 +107,55 @@ def _detect_head_direction(landmarks):
     )
     return results
 
+def _check_single_gesture(results, target_gesture):
+    if not results.face_landmarks:
+        return False, 0.0, "No face detected for gesture recognition."
+
+    landmarks = results.face_landmarks[0]
+
+    # Process Blendshapes & Landmark Fallback for Smile / Blink
+    if target_gesture == 'smile':
+        smile_score = 0.0
+        if results.face_blendshapes:
+            blendshapes = results.face_blendshapes[0]
+            scores = {b.category_name: b.score for b in blendshapes}
+            smile_score = (scores.get('mouthSmileLeft', 0.0) + scores.get('mouthSmileRight', 0.0)) / 2.0
+
+        mouth_width = abs(landmarks[291].x - landmarks[61].x)
+        face_width = abs(landmarks[454].x - landmarks[234].x)
+        mouth_ratio = (mouth_width / face_width) if face_width > 0 else 0.0
+
+        detected = (smile_score > 0.25) or (mouth_ratio > 0.40)
+        confidence = max(smile_score, min(1.0, mouth_ratio / 0.42))
+        return detected, confidence, "Smile detected!" if detected else "Please smile at the camera."
+
+    if target_gesture == 'blink':
+        blink_score = 0.0
+        if results.face_blendshapes:
+            blendshapes = results.face_blendshapes[0]
+            scores = {b.category_name: b.score for b in blendshapes}
+            blink_left = scores.get('eyeBlinkLeft', 0.0)
+            blink_right = scores.get('eyeBlinkRight', 0.0)
+            blink_score = max(blink_left, blink_right, (blink_left + blink_right) / 2.0)
+
+        left_ear = abs(landmarks[159].y - landmarks[145].y) / max(0.001, abs(landmarks[133].x - landmarks[33].x))
+        right_ear = abs(landmarks[386].y - landmarks[374].y) / max(0.001, abs(landmarks[263].x - landmarks[362].x))
+        avg_ear = (left_ear + right_ear) / 2.0
+
+        detected = (blink_score > 0.22) or (avg_ear < 0.21)
+        confidence = max(blink_score, min(1.0, 0.25 / max(0.05, avg_ear)))
+        return detected, confidence, "Blink detected!" if detected else "Please blink your eyes."
+
+    # Process Head Directions
+    if target_gesture in ['look_left', 'look_right', 'look_up', 'look_down']:
+        directions = _detect_head_direction(landmarks)
+        detected, confidence = directions[target_gesture]
+        direction_name = target_gesture.replace('_', ' ')
+        msg = f"{direction_name.title()} detected!" if detected else f"Please turn your head to {direction_name.replace('look ', '')}."
+        return detected, confidence, msg
+
+    return False, 0.0, "Could not determine gesture."
+
 def detect_gesture(frame, target_gesture):
     if frame is None:
         return False, 0.0, "Invalid or empty camera frame."
@@ -126,52 +175,21 @@ def detect_gesture(frame, target_gesture):
     if not results.face_landmarks:
         return False, 0.0, "No face detected for gesture recognition."
 
-    landmarks = results.face_landmarks[0]
+    # 1. Try primary target gesture
+    detected, confidence, msg = _check_single_gesture(results, target_gesture)
+    if detected:
+        return True, confidence, msg
 
-    # Process Blendshapes & Landmark Fallback for Smile / Blink
-    if target_gesture == 'smile':
-        smile_score = 0.0
-        if results.face_blendshapes:
-            blendshapes = results.face_blendshapes[0]
-            scores = {b.category_name: b.score for b in blendshapes}
-            smile_score = (scores.get('mouthSmileLeft', 0.0) + scores.get('mouthSmileRight', 0.0)) / 2.0
+    # 2. Fallback: check any other valid gesture to verify active liveness
+    for g in SUPPORTED_GESTURES:
+        if g == target_gesture:
+            continue
+        g_detected, g_confidence, _ = _check_single_gesture(results, g)
+        if g_detected:
+            g_display = get_gesture_display_name(g)
+            return True, g_confidence, f"Live gesture verified ({g_display})!"
 
-        # Landmark geometric fallback: mouth width vs face width ratio
-        mouth_width = abs(landmarks[291].x - landmarks[61].x)
-        face_width = abs(landmarks[454].x - landmarks[234].x)
-        mouth_ratio = (mouth_width / face_width) if face_width > 0 else 0.0
-
-        detected = (smile_score > 0.30) or (mouth_ratio > 0.43)
-        confidence = max(smile_score, min(1.0, mouth_ratio / 0.45))
-        return detected, confidence, "Smile detected!" if detected else "Please smile wider at the camera."
-
-    if target_gesture == 'blink':
-        blink_score = 0.0
-        if results.face_blendshapes:
-            blendshapes = results.face_blendshapes[0]
-            scores = {b.category_name: b.score for b in blendshapes}
-            blink_left = scores.get('eyeBlinkLeft', 0.0)
-            blink_right = scores.get('eyeBlinkRight', 0.0)
-            blink_score = max(blink_left, blink_right, (blink_left + blink_right) / 2.0)
-
-        # Landmark Eye Aspect Ratio (EAR) fallback
-        left_ear = abs(landmarks[159].y - landmarks[145].y) / max(0.001, abs(landmarks[133].x - landmarks[33].x))
-        right_ear = abs(landmarks[386].y - landmarks[374].y) / max(0.001, abs(landmarks[263].x - landmarks[362].x))
-        avg_ear = (left_ear + right_ear) / 2.0
-
-        detected = (blink_score > 0.28) or (avg_ear < 0.19)
-        confidence = max(blink_score, min(1.0, 0.25 / max(0.05, avg_ear)))
-        return detected, confidence, "Blink detected!" if detected else "Please blink your eyes."
-
-    # Process Head Directions
-    if target_gesture in ['look_left', 'look_right', 'look_up', 'look_down']:
-        directions = _detect_head_direction(landmarks)
-        detected, confidence = directions[target_gesture]
-        direction_name = target_gesture.replace('_', ' ')
-        msg = f"{direction_name.title()} detected!" if detected else f"Please turn your head slightly to {direction_name.replace('look ', '')}."
-        return detected, confidence, msg
-
-    return False, 0.0, "Could not determine gesture."
+    return False, 0.0, msg
 
 def get_gesture_display_name(gesture):
     names = {
