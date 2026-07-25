@@ -43,12 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 showTapToast(`Tap ${7 - tapCount} more time(s) for Admin access`);
             }
 
-            // Trigger modal on 7th tap
+            // Trigger redirect to Admin Login page (/admin/login) on 7th tap
             if (tapCount >= 7) {
                 e.preventDefault();
                 tapCount = 0;
                 clearTimeout(tapTimeout);
-                openAdminModal();
+                showTapToast('Redirecting to Admin Login Portal...');
+                window.location.href = '/admin/login';
                 return;
             }
 
