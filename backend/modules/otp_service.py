@@ -23,6 +23,10 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
     # Strategy A: Brevo HTTP API
     if brevo_key:
         try:
+            sender_email = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or 'arun12507086@gmail.com'
+            if 'faceguard.local' in sender_email or not '@' in sender_email:
+                sender_email = 'arun12507086@gmail.com'
+
             url = "https://api.brevo.com/v3/smtp/email"
             headers = {
                 "accept": "application/json",
@@ -30,7 +34,7 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
                 "content-type": "application/json"
             }
             payload = {
-                "sender": {"name": "FaceGuard Security", "email": config.get('MAIL_FROM_ADDRESS', 'noreply@faceguard.local')},
+                "sender": {"name": "FaceGuard Security", "email": sender_email},
                 "to": [{"email": recipient_email}],
                 "subject": subject,
                 "textContent": body
@@ -41,6 +45,7 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
                 return True, False, f"OTP email delivered via Brevo HTTP API to {recipient_email}"
             else:
                 print(f"[OTP SERVICE WARN] Brevo API status {res.status_code}: {res.text}")
+                return False, True, f"Brevo API error ({res.status_code}): {res.text}"
         except Exception as e:
             print(f"[OTP SERVICE WARN] Brevo API failed: {e}")
 
