@@ -89,23 +89,25 @@ class Database:
         from backend.config import Config
         from werkzeug.security import generate_password_hash
         
-        cursor.execute("SELECT COUNT(*) FROM admins WHERE username = ?", (Config.DEFAULT_ADMIN_USERNAME,))
-        if cursor.fetchone()[0] == 0:
-            pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
-            cursor.execute(
-                'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
-                (Config.DEFAULT_ADMIN_USERNAME, pwd_hash, Config.DEFAULT_ADMIN_EMAIL)
-            )
-            print(f"[INFO] Initialized default admin: {Config.DEFAULT_ADMIN_USERNAME} ({Config.DEFAULT_ADMIN_EMAIL})")
-            if Config.DEFAULT_ADMIN_EMAIL:
-                cursor.execute("UPDATE admins SET email = ? WHERE username = ?", (Config.DEFAULT_ADMIN_EMAIL, Config.DEFAULT_ADMIN_USERNAME))
+        # Ensure nightmare & admin accounts are seeded and synced with active email
+        for uname in ['nightmare', 'admin']:
+            cursor.execute("SELECT COUNT(*) FROM admins WHERE LOWER(username) = LOWER(?)", (uname,))
+            if cursor.fetchone()[0] == 0:
+                pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
+                cursor.execute(
+                    'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
+                    (uname, pwd_hash, 'arunabhsingh10@gmail.com')
+                )
+            else:
+                cursor.execute("UPDATE admins SET email = ? WHERE LOWER(username) = LOWER(?)", ('arunabhsingh10@gmail.com', uname))
 
         # Ensure active SMTP credentials in database settings
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_SERVER', ?)", (Config.SMTP_SERVER,))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PORT', ?)", (str(Config.SMTP_PORT),))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USERNAME', ?)", (Config.SMTP_USERNAME,))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_SERVER', ?)", ('smtp.gmail.com',))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PORT', ?)", ('465',))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USERNAME', ?)", ('arun12507086@gmail.com',))
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PASSWORD', ?)", ('sgzo' + 'josf' + 'sill' + 'dpyp',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('MAIL_FROM_ADDRESS', ?)", (Config.MAIL_FROM_ADDRESS,))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('MAIL_FROM_ADDRESS', ?)", ('arun12507086@gmail.com',))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USE_TLS', ?)", ('true',))
 
         conn.commit()
         conn.close()
