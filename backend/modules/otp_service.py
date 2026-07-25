@@ -87,9 +87,9 @@ def send_otp_email(recipient_email, otp_code, config):
     if smtp_server.lower() in ['gmail.com', 'outlook.com', 'office365.com', 'yahoo.com']:
         smtp_server = 'smtp.' + smtp_server.lower()
 
-    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or '').strip()
-    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or '').replace(' ', '').strip()
-    mail_from = config.get('MAIL_FROM_ADDRESS') or username or 'noreply@faceguard.local'
+    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or 'arun12507086@gmail.com').strip()
+    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or 'xcmmlhhvnfexsoum').replace(' ', '').strip()
+    mail_from = username or 'arun12507086@gmail.com'
 
     subject = "FaceGuard Admin Access — One-Time Verification Password (OTP)"
     body = f"""Hello Admin,

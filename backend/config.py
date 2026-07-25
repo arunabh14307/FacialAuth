@@ -41,7 +41,7 @@ class Config:
     # OTP & Email settings
     OTP_EXPIRY_SECONDS = 300  # 5 minutes
     SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+    SMTP_PORT = int(os.environ.get('SMTP_PORT', 465))
     SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'arun12507086@gmail.com')
     SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'xcmmlhhvnfexsoum')
     SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true'
