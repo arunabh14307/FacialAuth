@@ -25,7 +25,7 @@ def create_app():
     app.config['FACE_RECOGNITION_TOLERANCE'] = Config.FACE_RECOGNITION_TOLERANCE
     app.url_map.strict_slashes = False
 
-    # Initialize database with fallback for read-only serverless environments (Vercel)
+    # Initialize database with fallback for temporary environments
     db_path = app.config.get('DATABASE_PATH', Config.DATABASE_PATH)
     try:
         db = Database(db_path)
@@ -73,7 +73,7 @@ def create_app():
     return app
 
 
-# Top-level application export for WSGI deployment servers (Vercel, Render, Gunicorn, AWS)
+# Top-level application export for WSGI production servers (Render, Gunicorn)
 app = create_app()
 application = app
 handler = app

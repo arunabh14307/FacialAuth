@@ -11,7 +11,7 @@ class Config:
     if data_dir:
         DATABASE_PATH = os.path.join(data_dir, 'database.db')
         FACE_ENCODING_DIR = os.path.join(data_dir, 'face_encodings')
-    elif os.environ.get('VERCEL') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME') or os.environ.get('SERVERLESS'):
+    elif os.environ.get('SERVERLESS') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME'):
         DATABASE_PATH = '/tmp/database.db'
         FACE_ENCODING_DIR = '/tmp/face_encodings'
     else:
