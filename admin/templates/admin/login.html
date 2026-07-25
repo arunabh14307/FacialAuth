@@ -1,18 +1,21 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Admin Login — FaceGuard{% endblock %}
+{% block title %}Admin Login — FaceGuard Security{% endblock %}
 
 {% block content %}
 <div class="auth-page">
-    <div class="auth-container" style="max-width: 420px;">
+    <div class="auth-container" style="max-width: 440px;">
         <div class="auth-header">
             <div style="font-size: 3rem; margin-bottom: 1rem;">🛡️</div>
             <h2>Admin Login</h2>
-            <p>Access the administration panel</p>
+            <p id="admin-subtitle">Secure Two-Factor Authentication</p>
         </div>
 
-        <div class="glass-card">
-            <form method="POST" action="{{ url_for('admin.admin_login') }}">
+        <div id="status-box" class="hidden mb-3"></div>
+
+        <!-- Step 1: Username & Password -->
+        <div id="step-credentials" class="glass-card">
+            <form id="form-credentials">
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
                     <input type="text" id="username" name="username" class="form-input" placeholder="Enter admin username" required autocomplete="username">
@@ -23,10 +26,36 @@
                     <input type="password" id="password" name="password" class="form-input" placeholder="Enter password" required autocomplete="current-password">
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-lg w-full mt-2">
-                    🔐 Login
+                <button type="submit" id="btn-send-otp" class="btn btn-primary btn-lg w-full mt-2">
+                    🔐 Verify & Send OTP
                 </button>
             </form>
+        </div>
+
+        <!-- Step 2: 6-Digit OTP Verification -->
+        <div id="step-otp" class="glass-card hidden">
+            <div class="text-center mb-3">
+                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📩</div>
+                <h4 style="color: var(--text-primary); margin-bottom: 0.25rem;">Enter Security OTP</h4>
+                <p id="otp-target-email" style="color: var(--text-secondary); font-size: 0.9rem;">Check your email inbox for the 6-digit code.</p>
+            </div>
+
+            <form id="form-otp">
+                <div class="form-group">
+                    <label class="form-label" for="otp-code">One-Time Password (OTP)</label>
+                    <input type="text" id="otp-code" name="otp" class="form-input text-center" placeholder="123456" maxlength="6" pattern="[0-9]{6}" style="font-size: 1.5rem; letter-spacing: 0.4rem; font-weight: 700;" required autocomplete="one-time-code">
+                </div>
+
+                <button type="submit" id="btn-verify-otp" class="btn btn-primary btn-lg w-full mt-2">
+                    ✓ Verify OTP & Login
+                </button>
+            </form>
+
+            <div class="text-center mt-3">
+                <button type="button" id="btn-resend-otp" class="btn btn-secondary btn-sm" style="font-size: 0.85rem;">
+                    🔄 Resend OTP Code
+                </button>
+            </div>
         </div>
 
         <div class="text-center mt-3">
@@ -34,4 +63,105 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const formCreds = document.getElementById('form-credentials');
+    const formOtp = document.getElementById('form-otp');
+    const stepCreds = document.getElementById('step-credentials');
+    const stepOtp = document.getElementById('step-otp');
+    const statusBox = document.getElementById('status-box');
+    const btnSend = document.getElementById('btn-send-otp');
+    const btnVerify = document.getElementById('btn-verify-otp');
+    const btnResend = document.getElementById('btn-resend-otp');
+    const otpTargetEmail = document.getElementById('otp-target-email');
+
+    function showMsg(msg, type = 'info') {
+        const colors = {
+            success: 'background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981;',
+            error: 'background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444;',
+            info: 'background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6;'
+        };
+        statusBox.className = 'status-panel mb-3';
+        statusBox.style.cssText = `padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.9rem; ${colors[type] || colors.info}`;
+        statusBox.innerHTML = msg;
+        statusBox.classList.remove('hidden');
+    }
+
+    // Step 1: Send OTP
+    formCreds.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        btnSend.disabled = true;
+        btnSend.innerHTML = '⏳ Verifying & Sending OTP...';
+
+        try {
+            const res = await fetch('/admin/verify-credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                stepCreds.classList.add('hidden');
+                stepOtp.classList.remove('hidden');
+                otpTargetEmail.textContent = `A 6-digit verification code was sent to ${data.masked_email}.`;
+                showMsg(data.message, 'success');
+                document.getElementById('otp-code').focus();
+            } else {
+                showMsg(data.message || 'Invalid admin credentials.', 'error');
+            }
+        } catch (err) {
+            showMsg('Network error. Please try again.', 'error');
+        } finally {
+            btnSend.disabled = false;
+            btnSend.innerHTML = '🔐 Verify & Send OTP';
+        }
+    });
+
+    // Step 2: Verify OTP
+    formOtp.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const otp = document.getElementById('otp-code').value.trim();
+
+        btnVerify.disabled = true;
+        btnVerify.innerHTML = '⏳ Verifying OTP...';
+
+        try {
+            const res = await fetch('/admin/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ otp })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                showMsg('OTP Verified! Redirecting to Dashboard...', 'success');
+                setTimeout(() => {
+                    window.location.href = data.redirect || '/admin/dashboard';
+                }, 1000);
+            } else {
+                showMsg(data.message || 'Invalid OTP code.', 'error');
+            }
+        } catch (err) {
+            showMsg('Network error. Please try again.', 'error');
+        } finally {
+            btnVerify.disabled = false;
+            btnVerify.innerHTML = '✓ Verify OTP & Login';
+        }
+    });
+
+    // Resend OTP
+    if (btnResend) {
+        btnResend.addEventListener('click', () => {
+            stepOtp.classList.add('hidden');
+            stepCreds.classList.remove('hidden');
+            showMsg('Please click "Verify & Send OTP" to dispatch a new code.', 'info');
+        });
+    }
+});
+</script>
 {% endblock %}
