@@ -98,7 +98,8 @@ class Database:
             )
             print(f"[INFO] Initialized default admin: {Config.DEFAULT_ADMIN_USERNAME} ({Config.DEFAULT_ADMIN_EMAIL})")
         else:
-            cursor.execute("UPDATE admins SET email = ? WHERE username = ? AND (email IS NULL OR email = '')", (Config.DEFAULT_ADMIN_EMAIL, Config.DEFAULT_ADMIN_USERNAME))
+            if Config.DEFAULT_ADMIN_EMAIL:
+                cursor.execute("UPDATE admins SET email = ? WHERE username = ?", (Config.DEFAULT_ADMIN_EMAIL, Config.DEFAULT_ADMIN_USERNAME))
 
         conn.commit()
         conn.close()

@@ -70,12 +70,13 @@ def admin_login():
             try:
                 saved_settings = db.get_all_settings()
                 for key, val in saved_settings.items():
-                    if key == 'SMTP_PORT':
-                        current_app.config[key] = int(val) if val and val.isdigit() else 587
-                    elif key == 'SMTP_USE_TLS':
-                        current_app.config[key] = val.lower() == 'true'
-                    else:
-                        current_app.config[key] = val
+                    if val is not None and str(val).strip() != '':
+                        if key == 'SMTP_PORT':
+                            current_app.config[key] = int(val) if str(val).isdigit() else 587
+                        elif key == 'SMTP_USE_TLS':
+                            current_app.config[key] = str(val).lower() == 'true'
+                        else:
+                            current_app.config[key] = val
             except Exception:
                 pass
 
@@ -119,12 +120,13 @@ def verify_credentials():
     try:
         saved_settings = db.get_all_settings()
         for key, val in saved_settings.items():
-            if key == 'SMTP_PORT':
-                current_app.config[key] = int(val) if val and val.isdigit() else 587
-            elif key == 'SMTP_USE_TLS':
-                current_app.config[key] = val.lower() == 'true'
-            else:
-                current_app.config[key] = val
+            if val is not None and str(val).strip() != '':
+                if key == 'SMTP_PORT':
+                    current_app.config[key] = int(val) if str(val).isdigit() else 587
+                elif key == 'SMTP_USE_TLS':
+                    current_app.config[key] = str(val).lower() == 'true'
+                else:
+                    current_app.config[key] = val
     except Exception:
         pass
 
