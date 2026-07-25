@@ -134,10 +134,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 1000);
 
-        // Auto-check gesture every 1.5 seconds
+        // Auto-check gesture every 600ms for fast responsive detection
         gestureCheckInterval = setInterval(async () => {
             await checkGesture();
-        }, 1500);
+        }, 600);
 
         // Manual verify button
         if (verifyBtn) {
