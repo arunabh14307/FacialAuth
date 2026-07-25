@@ -32,7 +32,7 @@ class Config:
     # Admin defaults
     DEFAULT_ADMIN_USERNAME = 'admin'
     DEFAULT_ADMIN_PASSWORD = 'admin123'
-    DEFAULT_ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@faceguard.local')
+    DEFAULT_ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'arun12507086@gmail.com')
 
     # OTP & Email settings
     OTP_EXPIRY_SECONDS = 300  # 5 minutes

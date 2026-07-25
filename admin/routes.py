@@ -94,11 +94,14 @@ def verify_credentials():
     # Dispatch OTP email
     success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
 
+    display_message = f"OTP sent to {mask_email(admin_email)}" if not is_fallback else f"OTP generated for {mask_email(admin_email)}. (SMTP Setup required for inbox delivery)."
+
     return jsonify({
         'success': True,
-        'message': f"OTP sent to {mask_email(admin_email)}",
+        'message': display_message,
         'masked_email': mask_email(admin_email),
-        'is_fallback': is_fallback
+        'is_fallback': is_fallback,
+        'status_msg': msg
     })
 
 
