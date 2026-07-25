@@ -10,31 +10,43 @@ Supported gestures:
   - look_down: Head orientation
 """
 
-import cv2
-import numpy as np
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 import random
 import os
 
-# Initialize FaceLandmarker
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-model_path = os.path.join(base_dir, 'face_landmarker.task')
-
-base_options = python.BaseOptions(model_asset_path=model_path)
-options = vision.FaceLandmarkerOptions(
-    base_options=base_options,
-    output_face_blendshapes=True,
-    output_facial_transformation_matrixes=True,
-    num_faces=1)
-
-# Persistent detector to avoid reloading model per frame
 try:
-    detector = vision.FaceLandmarker.create_from_options(options)
+    import cv2
+    import numpy as np
+    import mediapipe as mp
+    from mediapipe.tasks import python
+    from mediapipe.tasks.python import vision
+    HAS_MEDIAPIPE = True
 except Exception as e:
-    print(f"Error loading FaceLandmarker: {e}")
-    detector = None
+    cv2 = None
+    np = None
+    mp = None
+    python = None
+    vision = None
+    HAS_MEDIAPIPE = False
+    print(f"[WARN] MediaPipe / OpenCV import error in gesture_detection: {e}")
+
+# Initialize FaceLandmarker
+detector = None
+if HAS_MEDIAPIPE and python is not None:
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        model_path = os.path.join(base_dir, 'face_landmarker.task')
+
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            output_face_blendshapes=True,
+            output_facial_transformation_matrixes=True,
+            num_faces=1)
+
+        detector = vision.FaceLandmarker.create_from_options(options)
+    except Exception as e:
+        print(f"Error loading FaceLandmarker: {e}")
+        detector = None
 
 # MediaPipe face mesh landmarks map exactly as before
 NOSE_TIP = 1

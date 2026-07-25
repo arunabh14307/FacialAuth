@@ -4,8 +4,16 @@ Face Detection Module — Detects faces using OpenCV's DNN-based YuNet model.
 YuNet is highly accurate and provides 5 facial landmarks needed for SFace alignment.
 """
 
-import cv2
-import numpy as np
+try:
+    import cv2
+    import numpy as np
+    HAS_OPENCV = True
+except Exception as e:
+    cv2 = None
+    np = None
+    HAS_OPENCV = False
+    print(f"[WARN] OpenCV import error in face_detection: {e}")
+
 import base64
 import os
 
@@ -17,6 +25,8 @@ _detector = None
 
 def _get_detector(input_size=(320, 320)):
     global _detector
+    if not HAS_OPENCV or cv2 is None:
+        return None
     if _detector is None:
         try:
             _detector = cv2.FaceDetectorYN.create(
@@ -31,12 +41,17 @@ def _get_detector(input_size=(320, 320)):
             print(f"Error loading YuNet model: {e}")
             return None
     else:
-        _detector.setInputSize(input_size)
+        try:
+            _detector.setInputSize(input_size)
+        except Exception:
+            pass
     return _detector
 
 
 def decode_base64_image(base64_string):
     """Decode a base64-encoded image string to a numpy array (BGR)."""
+    if not HAS_OPENCV or cv2 is None or np is None:
+        raise RuntimeError("OpenCV is unavailable in this environment.")
     if ',' in base64_string:
         base64_string = base64_string.split(',')[1]
 

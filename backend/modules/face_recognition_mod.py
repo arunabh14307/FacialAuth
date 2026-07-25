@@ -5,8 +5,16 @@ SFace is a highly accurate state-of-the-art CNN model available in OpenCV.
 It extracts a 128-dimensional embedding from aligned faces.
 """
 
-import cv2
-import numpy as np
+try:
+    import cv2
+    import numpy as np
+    HAS_OPENCV = True
+except Exception as e:
+    cv2 = None
+    np = None
+    HAS_OPENCV = False
+    print(f"[WARN] OpenCV import error in face_recognition_mod: {e}")
+
 import os
 from backend.modules.face_detection import detect_face
 
@@ -18,6 +26,8 @@ _recognizer = None
 
 def _get_recognizer():
     global _recognizer
+    if not HAS_OPENCV or cv2 is None:
+        return None
     if _recognizer is None:
         try:
             _recognizer = cv2.FaceRecognizerSF.create(
