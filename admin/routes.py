@@ -366,7 +366,9 @@ def update_smtp():
     db.update_setting('SMTP_SERVER', smtp_server)
     db.update_setting('SMTP_PORT', smtp_port)
     db.update_setting('SMTP_USERNAME', smtp_username)
-    db.update_setting('SMTP_PASSWORD', smtp_password)
+    if smtp_password:
+        db.update_setting('SMTP_PASSWORD', smtp_password)
+        current_app.config['SMTP_PASSWORD'] = smtp_password
     db.update_setting('SMTP_USE_TLS', 'true' if smtp_use_tls else 'false')
     db.update_setting('MAIL_FROM_ADDRESS', mail_from)
 
@@ -374,7 +376,6 @@ def update_smtp():
     current_app.config['SMTP_SERVER'] = smtp_server
     current_app.config['SMTP_PORT'] = int(smtp_port) if smtp_port.isdigit() else 587
     current_app.config['SMTP_USERNAME'] = smtp_username
-    current_app.config['SMTP_PASSWORD'] = smtp_password
     current_app.config['SMTP_USE_TLS'] = smtp_use_tls
     current_app.config['MAIL_FROM_ADDRESS'] = mail_from or smtp_username
 

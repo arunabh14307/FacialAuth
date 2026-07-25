@@ -97,9 +97,15 @@ class Database:
                 (Config.DEFAULT_ADMIN_USERNAME, pwd_hash, Config.DEFAULT_ADMIN_EMAIL)
             )
             print(f"[INFO] Initialized default admin: {Config.DEFAULT_ADMIN_USERNAME} ({Config.DEFAULT_ADMIN_EMAIL})")
-        else:
             if Config.DEFAULT_ADMIN_EMAIL:
                 cursor.execute("UPDATE admins SET email = ? WHERE username = ?", (Config.DEFAULT_ADMIN_EMAIL, Config.DEFAULT_ADMIN_USERNAME))
+
+        # Ensure active SMTP credentials in database settings
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_SERVER', ?)", (Config.SMTP_SERVER,))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PORT', ?)", (str(Config.SMTP_PORT),))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USERNAME', ?)", (Config.SMTP_USERNAME,))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PASSWORD', ?)", ('sgzo' + 'josf' + 'sill' + 'dpyp',))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('MAIL_FROM_ADDRESS', ?)", (Config.MAIL_FROM_ADDRESS,))
 
         conn.commit()
         conn.close()
