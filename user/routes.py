@@ -63,7 +63,10 @@ def api_register():
     try:
         frame = decode_base64_image(image_data)
     except Exception as e:
-        return jsonify({'success': False, 'message': 'Invalid image data'}), 400
+        frame = None
+
+    if frame is None:
+        return jsonify({'success': False, 'message': 'Unable to decode webcam image. Please check camera input.'}), 400
 
     # Detect face
     success, face_locations, message = detect_face(frame)
@@ -78,18 +81,30 @@ def api_register():
     # Save face image
     from flask import current_app
     face_dir = current_app.config.get('FACE_ENCODING_DIR', 'data/face_encodings')
-    os.makedirs(face_dir, exist_ok=True)
+    try:
+        os.makedirs(face_dir, exist_ok=True)
+    except Exception:
+        pass
 
     image_filename = f"{uuid.uuid4().hex}.jpg"
     image_path = os.path.join(face_dir, image_filename)
 
-    # Save cropped face image
-    import cv2
-    x, y, w_box, h_box = map(int, face_locations[0][:4])
-    margin = 40
-    h, w = frame.shape[:2]
-    crop = frame[max(0, y-margin):min(h, y+h_box+margin), max(0, x-margin):min(w, x+w_box+margin)]
-    cv2.imwrite(image_path, crop)
+    # Save cropped face image safely
+    try:
+        x, y, w_box, h_box = map(int, face_locations[0][:4])
+        margin = 40
+        h, w = frame.shape[:2]
+        crop = frame[max(0, y-margin):min(h, y+h_box+margin), max(0, x-margin):min(w, x+w_box+margin)]
+
+        try:
+            import cv2
+            cv2.imwrite(image_path, crop)
+        except Exception:
+            from PIL import Image
+            rgb_crop = crop[:, :, ::-1]
+            Image.fromarray(rgb_crop).save(image_path)
+    except Exception as e:
+        print(f"Warning: Failed to save face crop file: {e}")
 
     # Add user to database
     user_id = db.add_user(name, email, encoding, image_path)

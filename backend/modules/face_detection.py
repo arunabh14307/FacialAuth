@@ -16,6 +16,8 @@ except Exception as e:
 
 import base64
 import os
+import io
+from PIL import Image
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YUNET_MODEL_PATH = os.path.join(base_dir, 'face_detection_yunet.onnx')
@@ -50,15 +52,37 @@ def _get_detector(input_size=(320, 320)):
 
 def decode_base64_image(base64_string):
     """Decode a base64-encoded image string to a numpy array (BGR)."""
-    if not HAS_OPENCV or cv2 is None or np is None:
-        raise RuntimeError("OpenCV is unavailable in this environment.")
+    if not base64_string:
+        return None
+
     if ',' in base64_string:
         base64_string = base64_string.split(',')[1]
 
-    img_bytes = base64.b64decode(base64_string)
-    img_array = np.frombuffer(img_bytes, dtype=np.uint8)
-    frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-    return frame
+    try:
+        img_bytes = base64.b64decode(base64_string)
+    except Exception as e:
+        print(f"Base64 decode error: {e}")
+        return None
+
+    # Primary: OpenCV imdecode
+    if HAS_OPENCV and cv2 is not None and np is not None:
+        try:
+            img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+            frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            if frame is not None:
+                return frame
+        except Exception:
+            pass
+
+    # Secondary Fallback: Pillow decoding
+    try:
+        pil_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        rgb_arr = np.array(pil_img)
+        bgr_frame = rgb_arr[:, :, ::-1].copy()
+        return bgr_frame
+    except Exception as e:
+        print(f"Pillow decode error: {e}")
+        return None
 
 
 def detect_face(frame):
