@@ -87,14 +87,16 @@ class CameraManager {
             return null;
         }
 
-        // Update canvas dimensions to match video
-        this.canvas.width = this.videoElement.videoWidth || this.options.width;
-        this.canvas.height = this.videoElement.videoHeight || this.options.height;
+        const width = (this.videoElement.videoWidth && this.videoElement.videoWidth > 0) ? this.videoElement.videoWidth : this.options.width;
+        const height = (this.videoElement.videoHeight && this.videoElement.videoHeight > 0) ? this.videoElement.videoHeight : this.options.height;
+
+        this.canvas.width = width;
+        this.canvas.height = height;
 
         // Draw current frame (mirrored)
         this.ctx.save();
         this.ctx.scale(-1, 1);
-        this.ctx.drawImage(this.videoElement, -this.canvas.width, 0, this.canvas.width, this.canvas.height);
+        this.ctx.drawImage(this.videoElement, -width, 0, width, height);
         this.ctx.restore();
 
         // Convert to base64 JPEG
@@ -109,9 +111,12 @@ class CameraManager {
             return null;
         }
 
-        this.canvas.width = this.videoElement.videoWidth || this.options.width;
-        this.canvas.height = this.videoElement.videoHeight || this.options.height;
-        this.ctx.drawImage(this.videoElement, 0, 0, this.canvas.width, this.canvas.height);
+        const width = (this.videoElement.videoWidth && this.videoElement.videoWidth > 0) ? this.videoElement.videoWidth : this.options.width;
+        const height = (this.videoElement.videoHeight && this.videoElement.videoHeight > 0) ? this.videoElement.videoHeight : this.options.height;
+
+        this.canvas.width = width;
+        this.canvas.height = height;
+        this.ctx.drawImage(this.videoElement, 0, 0, width, height);
         return this.canvas.toDataURL('image/jpeg', quality);
     }
 }

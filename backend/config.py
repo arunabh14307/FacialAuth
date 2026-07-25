@@ -18,7 +18,7 @@ class Config:
         DATABASE_PATH = os.environ.get('DATABASE_PATH', os.path.join(BASE_DIR, 'database.db'))
         FACE_ENCODING_DIR = os.environ.get('FACE_ENCODING_DIR', os.path.join(BASE_DIR, 'data', 'face_encodings'))
 
-    FACE_RECOGNITION_TOLERANCE = 0.6  # Lower = stricter matching
+    FACE_RECOGNITION_TOLERANCE = 0.32  # SFace Cosine Similarity Threshold (Optimal: 0.320)
     FACE_RECOGNITION_MODEL = 'hog'    # 'hog' (CPU) or 'cnn' (GPU)
 
     # Gesture Detection

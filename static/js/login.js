@@ -181,7 +181,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.location.href = result.redirect || '/dashboard';
             }, 2000);
         } else if (result.message) {
-            showStatus('status-container', result.message, 'warning');
+            if (result.message.toLowerCase().includes('session expired') || result.message.toLowerCase().includes('expired')) {
+                clearInterval(gestureCheckInterval);
+                clearInterval(gestureTimerInterval);
+                showStatus('status-container', result.message, 'error');
+                setTimeout(() => resetLogin(), 2000);
+            } else {
+                showStatus('status-container', result.message, 'warning');
+            }
         }
     }
 
