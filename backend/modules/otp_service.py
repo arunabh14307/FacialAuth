@@ -80,16 +80,16 @@ def send_otp_email(recipient_email, otp_code, config):
     Send OTP code to the recipient email address via HTTPS API or SMTP.
     Returns tuple: (success: bool, is_fallback: bool, message: str)
     """
-    smtp_server = (config.get('SMTP_SERVER') or os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
-    if '@' in smtp_server:
+    smtp_server = (config.get('SMTP_SERVER') or os.environ.get('SMTP_SERVER') or 'smtp-relay.brevo.com').strip()
+    if '@' in smtp_server and 'brevo.com' not in smtp_server:
         smtp_server = smtp_server.split('@')[-1]
 
     if smtp_server.lower() in ['gmail.com', 'outlook.com', 'office365.com', 'yahoo.com']:
         smtp_server = 'smtp.' + smtp_server.lower()
 
-    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or 'arun12507086@gmail.com').strip()
-    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or 'xcmmlhhvnfexsoum').replace(' ', '').strip()
-    mail_from = username or 'arun12507086@gmail.com'
+    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or 'b33808001@smtp-brevo.com').strip()
+    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or '').replace(' ', '').strip()
+    mail_from = config.get('MAIL_FROM_ADDRESS') or os.environ.get('MAIL_FROM_ADDRESS') or 'arunabhsingh10@gmail.com'
 
     subject = "FaceGuard Admin Access — One-Time Verification Password (OTP)"
     body = f"""Hello Admin,

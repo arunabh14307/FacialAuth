@@ -38,14 +38,14 @@ class Config:
     DEFAULT_ADMIN_PASSWORD = 'admin123'
     DEFAULT_ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'arunabhsingh10@gmail.com')
 
-    # OTP & Email settings
+    # OTP & Email settings (Brevo SMTP Relay Defaults)
     OTP_EXPIRY_SECONDS = 300  # 5 minutes
-    SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-    SMTP_PORT = int(os.environ.get('SMTP_PORT', 465))
-    SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'arun12507086@gmail.com')
-    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'xcmmlhhvnfexsoum')
+    SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
+    SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+    SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'b33808001@smtp-brevo.com')
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
     SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true'
-    MAIL_FROM_ADDRESS = os.environ.get('MAIL_FROM_ADDRESS', 'arun12507086@gmail.com')
+    MAIL_FROM_ADDRESS = os.environ.get('MAIL_FROM_ADDRESS', 'arunabhsingh10@gmail.com')
     BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
     RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 
