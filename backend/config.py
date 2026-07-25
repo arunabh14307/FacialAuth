@@ -42,4 +42,6 @@ class Config:
     SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'xcmmlhhvnfexsoum')
     SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() == 'true'
     MAIL_FROM_ADDRESS = os.environ.get('MAIL_FROM_ADDRESS', 'arun12507086@gmail.com')
+    BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+    RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 

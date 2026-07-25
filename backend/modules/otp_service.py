@@ -1,10 +1,8 @@
-"""
-OTP Service — Generates 6-digit one-time passwords and dispatches them via SMTP or dev fallback.
-"""
-
 import random
 import string
 import smtplib
+import os
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -14,11 +12,67 @@ def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
 
 
+def send_via_http_api(recipient_email, otp_code, subject, body, config):
+    """
+    Dispatch email using HTTPS REST API (Brevo or Resend) on Port 443.
+    Bypasses raw TCP SMTP port restrictions and datacenter IP blocks.
+    """
+    brevo_key = config.get('BREVO_API_KEY') or os.environ.get('BREVO_API_KEY', '')
+    resend_key = config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY', '')
+
+    # Strategy A: Brevo HTTP API
+    if brevo_key:
+        try:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": brevo_key.strip(),
+                "content-type": "application/json"
+            }
+            payload = {
+                "sender": {"name": "FaceGuard Security", "email": config.get('MAIL_FROM_ADDRESS', 'noreply@faceguard.local')},
+                "to": [{"email": recipient_email}],
+                "subject": subject,
+                "textContent": body
+            }
+            res = requests.post(url, headers=headers, json=payload, timeout=10)
+            if res.status_code in [200, 201, 202]:
+                print(f"[OTP SERVICE SUCCESS] Email delivered to {recipient_email} via Brevo HTTPS API")
+                return True, False, f"OTP email delivered via Brevo HTTP API to {recipient_email}"
+            else:
+                print(f"[OTP SERVICE WARN] Brevo API status {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"[OTP SERVICE WARN] Brevo API failed: {e}")
+
+    # Strategy B: Resend HTTP API
+    if resend_key:
+        try:
+            url = "https://api.resend.com/emails"
+            headers = {
+                "Authorization": f"Bearer {resend_key.strip()}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "from": config.get('MAIL_FROM_ADDRESS', 'onboarding@resend.dev'),
+                "to": [recipient_email],
+                "subject": subject,
+                "text": body
+            }
+            res = requests.post(url, headers=headers, json=payload, timeout=10)
+            if res.status_code in [200, 201, 202]:
+                print(f"[OTP SERVICE SUCCESS] Email delivered to {recipient_email} via Resend HTTPS API")
+                return True, False, f"OTP email delivered via Resend HTTP API to {recipient_email}"
+            else:
+                print(f"[OTP SERVICE WARN] Resend API status {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"[OTP SERVICE WARN] Resend API failed: {e}")
+
+    return False, True, "No HTTP Email API configured"
+
+
 def send_otp_email(recipient_email, otp_code, config):
     """
-    Send OTP code to the recipient email address via SMTP.
-    If SMTP server is configured, sends via network SMTP.
-    Otherwise, logs to console and returns fallback status.
+    Send OTP code to the recipient email address via HTTPS API or SMTP.
     Returns tuple: (success: bool, is_fallback: bool, message: str)
     """
     smtp_server = config.get('SMTP_SERVER', '').strip()
@@ -41,6 +95,11 @@ This OTP is valid for 5 minutes. If you did not request this access, please secu
 Regards,
 FaceGuard Security Team
 """
+
+    # Check HTTPS API first
+    api_success, api_fallback, api_msg = send_via_http_api(recipient_email, otp_code, subject, body, config)
+    if api_success and not api_fallback:
+        return True, False, api_msg
 
     if smtp_server:
         port = int(config.get('SMTP_PORT', 587))
