@@ -14,7 +14,12 @@ class Database:
 
     def __init__(self, db_path):
         self.db_path = db_path
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+            except Exception:
+                pass
 
     def get_connection(self):
         """Get a database connection with row factory."""
@@ -79,6 +84,18 @@ class Database:
                 setting_value TEXT
             )
         ''')
+
+        # Ensure default admin user is always seeded
+        cursor.execute('SELECT COUNT(*) FROM admins')
+        if cursor.fetchone()[0] == 0:
+            from werkzeug.security import generate_password_hash
+            from backend.config import Config
+            pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
+            cursor.execute(
+                'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
+                (Config.DEFAULT_ADMIN_USERNAME, pwd_hash, Config.DEFAULT_ADMIN_EMAIL)
+            )
+            print(f"[INFO] Initialized default admin: {Config.DEFAULT_ADMIN_USERNAME}")
 
         conn.commit()
         conn.close()

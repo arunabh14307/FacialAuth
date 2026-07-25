@@ -120,8 +120,6 @@ def match_face(encoding, stored_encodings, tolerance=0.6):
         encoding: 128D numpy array of the face to match
         stored_encodings: dict of {user_id: encoding}
         tolerance: float
-                   In SFace, cosine similarity >= 0.363 is a match for FPR=1e-5.
-                   We'll map 'tolerance' to a suitable threshold.
 
     Returns:
         tuple: (matched, user_id, confidence, message)
@@ -134,22 +132,26 @@ def match_face(encoding, stored_encodings, tolerance=0.6):
     
     recognizer = _get_recognizer()
 
+    feat1 = np.array(encoding, dtype=np.float32).reshape(1, -1)
+    norm1 = np.linalg.norm(feat1)
+    feat1_norm = feat1 / norm1 if norm1 > 0 else feat1
+
     for user_id, stored_enc in stored_encodings.items():
         try:
-            # SFace embeddings must be (1, 128) shape for the match function
-            feat1 = encoding.reshape(1, -1)
-            feat2 = np.array(stored_enc).reshape(1, -1)
+            feat2 = np.array(stored_enc, dtype=np.float32).reshape(1, -1)
+            
+            similarity = -1.0
+            if recognizer is not None:
+                try:
+                    similarity = float(recognizer.match(feat1, feat2, 0))
+                except Exception:
+                    pass
 
-            # Cosine similarity using SFace builtin function
-            # Alternatively: cv2.FaceRecognizerSF_FR_COSINE = 0
-            if recognizer:
-                similarity = recognizer.match(feat1, feat2, 0)
-            else:
-                # Manual Cosine similarity fallback
-                dot_product = np.dot(feat1[0], feat2[0])
-                norm1 = np.linalg.norm(feat1[0])
-                norm2 = np.linalg.norm(feat2[0])
-                similarity = dot_product / (norm1 * norm2)
+            if similarity <= -0.9:
+                # Cosine similarity fallback
+                norm2 = np.linalg.norm(feat2)
+                feat2_norm = feat2 / norm2 if norm2 > 0 else feat2
+                similarity = float(np.dot(feat1_norm[0], feat2_norm[0]))
 
             if similarity > best_similarity:
                 best_similarity = similarity
@@ -162,12 +164,11 @@ def match_face(encoding, stored_encodings, tolerance=0.6):
     if best_match_id is None:
         return False, None, 0.0, "Could not compare faces."
 
-    # SFace Threshold: 0.363 is highly accurate. We can adjust based on tolerance.
-    # If tolerance is 0.6 (default), let's set a safe threshold.
-    # Lower tolerance = Higher required threshold
-    match_threshold = 0.363 + ((0.6 - tolerance) * 0.2)
+    # SFace benchmark cosine similarity threshold is 0.363
+    # Use 0.320 for flexible real-world webcam matching
+    match_threshold = 0.320
 
-    confidence = max(0.0, min(1.0, best_similarity)) # In SFace it can technically range roughly -1 to 1
+    confidence = max(0.0, min(1.0, float(best_similarity)))
 
     if best_similarity >= match_threshold:
         return True, best_match_id, confidence, f"Face matched with confidence {confidence:.1%}"
