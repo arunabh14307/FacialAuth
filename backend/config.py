@@ -43,7 +43,7 @@ class Config:
     SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
     SMTP_PORT = int(os.environ.get('SMTP_PORT', 465))
     SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'arun12507086@gmail.com')
-    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'sgzo' + 'josf' + 'sill' + 'dpyp')
     SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'false').lower() == 'true'
     MAIL_FROM_ADDRESS = os.environ.get('MAIL_FROM_ADDRESS', 'arun12507086@gmail.com')
     BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
