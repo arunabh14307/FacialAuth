@@ -91,6 +91,19 @@ def verify_credentials():
         'created_at': time.time()
     }
 
+    # Refresh latest persistent system settings into config
+    try:
+        saved_settings = db.get_all_settings()
+        for key, val in saved_settings.items():
+            if key == 'SMTP_PORT':
+                current_app.config[key] = int(val) if val and val.isdigit() else 587
+            elif key == 'SMTP_USE_TLS':
+                current_app.config[key] = val.lower() == 'true'
+            else:
+                current_app.config[key] = val
+    except Exception:
+        pass
+
     # Dispatch OTP email
     success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
 

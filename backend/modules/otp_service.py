@@ -46,7 +46,7 @@ FaceGuard Security Team
         try:
             port = int(config.get('SMTP_PORT', 587))
             username = config.get('SMTP_USERNAME', '').strip()
-            password = config.get('SMTP_PASSWORD', '').strip()
+            password = config.get('SMTP_PASSWORD', '').replace(' ', '').strip()
             use_tls = config.get('SMTP_USE_TLS', True)
             if isinstance(use_tls, str):
                 use_tls = use_tls.lower() == 'true'
