@@ -87,18 +87,18 @@ class Database:
 
         # Ensure default admin user is always seeded with real email
         from backend.config import Config
-        cursor.execute('SELECT COUNT(*) FROM admins')
+        from werkzeug.security import generate_password_hash
+        
+        cursor.execute("SELECT COUNT(*) FROM admins WHERE username = ?", (Config.DEFAULT_ADMIN_USERNAME,))
         if cursor.fetchone()[0] == 0:
-            from werkzeug.security import generate_password_hash
             pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
             cursor.execute(
                 'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
                 (Config.DEFAULT_ADMIN_USERNAME, pwd_hash, Config.DEFAULT_ADMIN_EMAIL)
             )
-            print(f"[INFO] Initialized default admin: {Config.DEFAULT_ADMIN_USERNAME}")
+            print(f"[INFO] Initialized default admin: {Config.DEFAULT_ADMIN_USERNAME} ({Config.DEFAULT_ADMIN_EMAIL})")
         else:
-            # Update existing default admin email if placeholder
-            cursor.execute("UPDATE admins SET email = ? WHERE username = 'admin' AND (email IS NULL OR email = '' OR email LIKE '%@faceguard.local')", (Config.DEFAULT_ADMIN_EMAIL,))
+            cursor.execute("UPDATE admins SET email = ? WHERE username = ?", (Config.DEFAULT_ADMIN_EMAIL, Config.DEFAULT_ADMIN_USERNAME))
 
         conn.commit()
         conn.close()
