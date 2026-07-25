@@ -123,36 +123,33 @@ FaceGuard Security Team
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
-        # Strategy 1: Direct SSL Port 465 (Bypasses STARTTLS firewall blocks)
-        if port == 465 or 'gmail' in smtp_server.lower():
+        # Multi-port strategy: Try user port, 2525, 587, 465 automatically
+        ports_to_try = [port, 2525, 587, 465] if 'brevo' in smtp_server.lower() else [port, 465, 587, 2525]
+        ports_to_try = list(dict.fromkeys(ports_to_try))
+
+        last_error = "Unknown error"
+        for p in ports_to_try:
             try:
-                server = smtplib.SMTP_SSL(smtp_server, 465, timeout=12)
+                if p == 465:
+                    server = smtplib.SMTP_SSL(smtp_server, 465, timeout=10)
+                else:
+                    server = smtplib.SMTP(smtp_server, p, timeout=10)
+                    if use_tls or p in [587, 2525]:
+                        server.starttls()
+
                 if username and password:
                     server.login(username, password)
+
                 server.sendmail(mail_from, [recipient_email], msg.as_string())
                 server.quit()
-                print(f"[OTP SERVICE SUCCESS] Real email sent to {recipient_email} via SMTP_SSL (port 465)")
+                print(f"[OTP SERVICE SUCCESS] Real email sent to {recipient_email} via SMTP ({smtp_server}:{p})")
                 return True, False, f"OTP email sent successfully to {recipient_email}"
             except Exception as e:
-                print(f"[OTP SERVICE WARN] Port 465 SSL failed: {e}. Trying TLS port {port}...")
+                last_error = str(e)
+                print(f"[OTP SERVICE WARN] Port {p} failed on {smtp_server}: {last_error}")
 
-        # Strategy 2: TLS Port 587
-        try:
-            server = smtplib.SMTP(smtp_server, port, timeout=12)
-            if use_tls:
-                server.starttls()
-            if username and password:
-                server.login(username, password)
-
-            server.sendmail(mail_from, [recipient_email], msg.as_string())
-            server.quit()
-            print(f"[OTP SERVICE SUCCESS] Real email sent to {recipient_email} via SMTP ({smtp_server}:{port})")
-            return True, False, f"OTP email sent successfully to {recipient_email}"
-        except Exception as e:
-            error_msg = str(e)
-            print(f"[OTP SERVICE ERROR] Failed to send email via SMTP ({smtp_server}): {error_msg}")
-            print(f"[OTP SERVICE FALLBACK] Code for {recipient_email}: [{otp_code}]")
-            return True, True, f"SMTP delivery failed ({error_msg}). Dev OTP code generated."
+        print(f"[OTP SERVICE FALLBACK] All ports failed for {recipient_email}: [{otp_code}]")
+        return True, True, f"SMTP delivery failed ({last_error}). Dev OTP code generated."
     else:
         # Dev / Offline fallback mode
         print("\n" + "=" * 50)
