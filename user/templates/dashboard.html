@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — FaceGuard{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem;">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="user-greeting">
+            <div class="user-avatar">
+                {{ user.name[0] | upper if user else '?' }}
+            </div>
+            <div>
+                <h2 style="margin-bottom: 0;">Welcome, {{ user.name }}!</h2>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                    {{ user.email }}
+                </p>
+            </div>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary direct-logout">
+            Logout
+        </a>
+    </div>
+
+    <!-- Success Banner -->
+    <div class="glass-card" style="background: linear-gradient(135deg, rgba(0, 230, 118, 0.08), rgba(0, 212, 170, 0.08)); border-color: rgba(0, 230, 118, 0.2); margin-bottom: 2rem;">
+        <div class="d-flex align-center gap-2">
+            <div style="font-size: 2rem;">✅</div>
+            <div>
+                <h3 style="color: var(--success); margin-bottom: 0.25rem;">Authentication Verified</h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                    You have been authenticated using facial recognition and gesture verification.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Info Card -->
+    <div class="glass-card mb-3">
+        <h3 class="mb-2">👤 Your Profile</h3>
+        <div class="stats-grid">
+            <div class="glass-card stat-card">
+                <div class="stat-value purple">🛡️</div>
+                <div class="stat-label">Security Level: High</div>
+            </div>
+            <div class="glass-card stat-card">
+                <div class="stat-value teal" style="font-size: 1.5rem;">{{ user.created_at[:10] if user.created_at else 'N/A' }}</div>
+                <div class="stat-label">Member Since</div>
+            </div>
+            <div class="glass-card stat-card">
+                <div class="stat-value green">{{ logs | length }}</div>
+                <div class="stat-label">Recent Logins</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Login Activity -->
+    <div class="glass-card">
+        <h3 class="mb-2">📋 Recent Login Activity</h3>
+
+        {% if logs %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Status</th>
+                        <th>Gesture</th>
+                        <th>Result</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.login_time }}</td>
+                        <td>
+                            <span class="badge {% if log.status == 'Success' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ log.status }}
+                            </span>
+                        </td>
+                        <td>{{ log.gesture_type or '—' }}</td>
+                        <td>
+                            {% if log.gesture_result %}
+                            <span class="badge {% if log.gesture_result == 'Verified' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ log.gesture_result }}
+                            </span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td style="color: var(--text-muted);">{{ log.ip_address or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>No login activity recorded yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

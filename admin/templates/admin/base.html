@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin — FaceGuard{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Admin Navigation -->
+    <nav class="navbar">
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="nav-brand">
+            <div class="brand-icon">🛡️</div>
+            <span>FaceGuard <span style="font-size: 0.7rem; opacity: 0.6; font-weight: 400;">ADMIN</span></span>
+        </a>
+        <ul class="nav-links">
+            {% if session.get('admin_logged_in') %}
+            <li><a href="{{ url_for('admin.admin_dashboard') }}" class="{% if request.endpoint == 'admin.admin_dashboard' %}active{% endif %}">Dashboard</a></li>
+            <li><a href="{{ url_for('admin.admin_users') }}" class="{% if request.endpoint == 'admin.admin_users' %}active{% endif %}">Users</a></li>
+            <li><a href="{{ url_for('admin.admin_logs') }}" class="{% if request.endpoint == 'admin.admin_logs' %}active{% endif %}">Logs</a></li>
+            <li><a href="{{ url_for('admin.admin_settings') }}" class="{% if request.endpoint == 'admin.admin_settings' %}active{% endif %}">Settings</a></li>
+            {% endif %}
+            <li><a href="{{ url_for('auth.index') }}" style="font-size: 0.8rem; opacity: 0.6;">← Main Site</a></li>
+        </ul>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Page Content -->
+    <main class="page-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout_modal.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

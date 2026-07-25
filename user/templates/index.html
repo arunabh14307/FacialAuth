@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}FaceGuard — Secure Facial Recognition Authentication{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>
+            Secure Login with<br>
+            <span class="gradient-text">Facial Recognition</span>
+        </h1>
+
+        <p class="subtitle">
+            Experience seamless authentication powered by AI facial recognition
+            and gesture-based liveness detection. No passwords needed.
+        </p>
+
+        <!-- Feature Cards -->
+        <div class="features-grid" style="width: 100%; max-width: 1000px;">
+            <div class="glass-card feature-card">
+                <div class="feature-icon purple">👤</div>
+                <h3>Face Recognition</h3>
+                <p>Advanced AI-powered facial recognition with 128-point face encoding for accurate identity verification.</p>
+            </div>
+
+            <div class="glass-card feature-card">
+                <div class="feature-icon teal">🎭</div>
+                <h3>Gesture Authentication</h3>
+                <p>Liveness detection through random gesture challenges — smile, blink, or look in different directions.</p>
+            </div>
+
+            <div class="glass-card feature-card">
+                <div class="feature-icon pink">⚡</div>
+                <h3>Fast & Secure</h3>
+                <p>Complete authentication in under 5 seconds with anti-spoofing protection against photos and videos.</p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

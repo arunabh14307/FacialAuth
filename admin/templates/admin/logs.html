@@ -1,0 +1,114 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Login Logs — FaceGuard Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem;">
+    <div class="dashboard-header">
+        <div>
+            <h2>📋 Login Logs</h2>
+            <p style="color: var(--text-secondary);">View and filter authentication attempts</p>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="glass-card mb-3">
+        <form method="GET" action="{{ url_for('admin.admin_logs') }}">
+            <div class="filter-bar">
+                <label style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;">Filters:</label>
+
+                <select name="status">
+                    <option value="">All Status</option>
+                    <option value="Success" {% if current_status == 'Success' %}selected{% endif %}>✓ Success</option>
+                    <option value="Failed" {% if current_status == 'Failed' %}selected{% endif %}>✕ Failed</option>
+                </select>
+
+                <select name="user_id">
+                    <option value="">All Users</option>
+                    {% for user in users %}
+                    <option value="{{ user.user_id }}" {% if current_user == user.user_id|string %}selected{% endif %}>
+                        {{ user.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <select name="limit">
+                    <option value="25">Last 25</option>
+                    <option value="50" selected>Last 50</option>
+                    <option value="100">Last 100</option>
+                    <option value="500">Last 500</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                <a href="{{ url_for('admin.admin_logs') }}" class="btn btn-secondary btn-sm">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="glass-card">
+        {% if logs %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Date & Time</th>
+                        <th>Status</th>
+                        <th>Gesture Type</th>
+                        <th>Gesture Result</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td style="color: var(--text-muted);">#{{ log.log_id }}</td>
+                        <td>
+                            {% if log.user_name %}
+                            <div class="d-flex align-center gap-1">
+                                <div class="user-avatar" style="width: 24px; height: 24px; font-size: 0.65rem;">
+                                    {{ log.user_name[0] | upper }}
+                                </div>
+                                {{ log.user_name }}
+                            </div>
+                            {% else %}
+                            <span style="color: var(--text-muted);">Unknown</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.login_time }}</td>
+                        <td>
+                            <span class="badge {% if log.status == 'Success' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ log.status }}
+                            </span>
+                        </td>
+                        <td>{{ log.gesture_type or '—' }}</td>
+                        <td>
+                            {% if log.gesture_result %}
+                            <span class="badge {% if log.gesture_result == 'Verified' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ log.gesture_result }}
+                            </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.85rem;">{{ log.ip_address or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="text-center mt-2">
+            <p style="color: var(--text-muted); font-size: 0.8rem;">
+                Showing {{ logs | length }} records
+            </p>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>No login logs found with the current filters.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

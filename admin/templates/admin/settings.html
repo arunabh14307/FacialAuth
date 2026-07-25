@@ -1,0 +1,454 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Settings & Facial Access Summary — FaceGuard Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+    <!-- Dashboard / Settings Header -->
+    <div class="dashboard-header">
+        <div>
+            <h2>⚙️ Admin Settings & Facial Access Summary</h2>
+            <p style="color: var(--text-secondary);">Configure admin account, register email address, update credentials, and review facial recognition analytics.</p>
+        </div>
+        <div>
+            <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-secondary" style="font-size: 0.85rem;">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Settings Navigation Bar -->
+    <div class="glass-card mb-3" style="padding: 0.75rem 1.25rem;">
+        <div class="d-flex align-center justify-between flex-wrap gap-2">
+            <div class="d-flex align-center gap-1 flex-wrap">
+                <a href="#account-settings" class="btn btn-secondary btn-sm settings-nav-btn active-tab-btn" onclick="switchSettingsTab(event, 'account-section')">
+                    📧 Admin Profile & Email
+                </a>
+                <a href="#password-settings" class="btn btn-secondary btn-sm settings-nav-btn" onclick="switchSettingsTab(event, 'password-section')">
+                    🔒 Password Security
+                </a>
+                <a href="#facial-summary" class="btn btn-secondary btn-sm settings-nav-btn" onclick="switchSettingsTab(event, 'facial-section')">
+                    📊 Facial Access Summary
+                </a>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+                Logged in as: <strong style="color: var(--primary-light);">{{ admin.username }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-settings-grid">
+        <!-- LEFT COLUMN: Admin Credentials & Email Registration -->
+        <div class="settings-col-left" style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+            <!-- Account & Email Registration Section -->
+            <div id="account-section" class="glass-card settings-section-card">
+                <div class="d-flex align-center gap-2 mb-3">
+                    <div style="width: 42px; height: 42px; border-radius: var(--radius-md); background: rgba(108, 99, 255, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                        📧
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.15rem; margin-bottom: 0.1rem;">Register & Update Email</h3>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary);">Manage registered email ID for OTP verification and notifications</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin.update_profile') }}">
+                    <div class="form-group">
+                        <label class="form-label">Admin Username ID</label>
+                        <input type="text" name="username" class="form-input" value="{{ admin.username }}" required placeholder="e.g. admin">
+                        <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 0.3rem;">Used for admin login and system identification.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Registered Admin Email</label>
+                        <input type="email" name="email" class="form-input" value="{{ admin.email or '' }}" required placeholder="e.g. admin@faceguard.local">
+                        <div class="d-flex align-center justify-between mt-1">
+                            <small style="color: var(--text-muted); font-size: 0.75rem;">Receives 2FA OTP codes and security alerts.</small>
+                            <span class="badge badge-success" style="font-size: 0.7rem;">✓ Active Email</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-full mt-2">
+                        💾 Save Email & Username
+                    </button>
+                </form>
+            </div>
+
+            <!-- SMTP Server & Real Email Setup Section -->
+            <div id="smtp-section" class="glass-card settings-section-card">
+                <div class="d-flex align-center gap-2 mb-3">
+                    <div style="width: 42px; height: 42px; border-radius: var(--radius-md); background: rgba(255, 215, 64, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                        ⚡
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.15rem; margin-bottom: 0.1rem;">SMTP Email Delivery Setup</h3>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary);">Configure SMTP server (Gmail, Outlook, Mailtrap) to send real OTP emails</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin.update_smtp') }}">
+                    <div class="form-group">
+                        <label class="form-label">SMTP Server Host</label>
+                        <input type="text" name="smtp_server" class="form-input" value="{{ smtp.server }}" placeholder="e.g. smtp.gmail.com">
+                        <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 0.2rem;">Leave blank for local dev mode fallback.</small>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">SMTP Port</label>
+                            <input type="number" name="smtp_port" class="form-input" value="{{ smtp.port }}" placeholder="587">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">Security</label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.8rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.85rem; cursor: pointer;">
+                                <input type="checkbox" name="smtp_use_tls" {% if smtp.use_tls %}checked{% endif %}>
+                                Enable TLS
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">SMTP Username / Email</label>
+                        <input type="text" name="smtp_username" class="form-input" value="{{ smtp.username }}" placeholder="e.g. your_email@gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">SMTP Password / App Password</label>
+                        <input type="password" name="smtp_password" class="form-input" value="{{ smtp.password }}" placeholder="e.g. 16-char Gmail App Password">
+                        <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 0.2rem;">For Gmail, use a 16-character App Password generated in Google Account settings.</small>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-2">
+                        <button type="submit" class="btn btn-secondary w-full" style="flex: 1;">
+                            ⚙️ Save SMTP Settings
+                        </button>
+                        <button type="button" id="btn-test-email" class="btn btn-primary" style="flex: 1; background: linear-gradient(135deg, var(--secondary), #00A389);">
+                            ✉️ Send Test OTP
+                        </button>
+                    </div>
+                    <div id="test-email-result" class="status-panel hidden mt-2"></div>
+                </form>
+            </div>
+
+            <!-- Change Password Section -->
+            <div id="password-section" class="glass-card settings-section-card">
+                <div class="d-flex align-center gap-2 mb-3">
+                    <div style="width: 42px; height: 42px; border-radius: var(--radius-md); background: rgba(0, 212, 170, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                        🔒
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.15rem; margin-bottom: 0.1rem;">Change Admin Password</h3>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary);">Update admin password credentials</p>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('admin.change_password') }}">
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" name="current_password" class="form-input" required placeholder="Enter current password">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">New Password</label>
+                        <input type="password" name="new_password" class="form-input" required minlength="6" placeholder="Enter new password (min 6 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password</label>
+                        <input type="password" name="confirm_password" class="form-input" required minlength="6" placeholder="Confirm new password">
+                    </div>
+
+                    <button type="submit" class="btn btn-secondary w-full mt-2" style="border-color: var(--secondary); color: var(--secondary-light);">
+                        🔑 Update Password
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Facial Access Analytics & Summary -->
+        <div class="settings-col-right" id="facial-section">
+
+            <!-- Facial Access Summary Overview Cards -->
+            <div class="glass-card mb-3">
+                <div class="d-flex align-center justify-between mb-3 flex-wrap gap-1">
+                    <div class="d-flex align-center gap-2">
+                        <div style="width: 42px; height: 42px; border-radius: var(--radius-md); background: rgba(255, 107, 157, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                            👁️
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1.25rem;">Facial Recognition Access Summary</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary);">Comprehensive metrics for facial logins, gesture authentications, and user activity</p>
+                        </div>
+                    </div>
+                    <span class="badge badge-info" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">
+                        Real-time Analytics
+                    </span>
+                </div>
+
+                <!-- KPI Grid -->
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="glass-card stat-card" style="padding: 1.25rem;">
+                        <div class="stat-value purple" data-count="{{ summary.total_attempts }}">{{ summary.total_attempts }}</div>
+                        <div class="stat-label">Total Facial Logins</div>
+                    </div>
+                    <div class="glass-card stat-card" style="padding: 1.25rem;">
+                        <div class="stat-value green" data-count="{{ summary.total_success }}">{{ summary.total_success }}</div>
+                        <div class="stat-label">Successful Facial Access</div>
+                    </div>
+                    <div class="glass-card stat-card" style="padding: 1.25rem;">
+                        <div class="stat-value pink" data-count="{{ summary.total_failed }}">{{ summary.total_failed }}</div>
+                        <div class="stat-label">Failed Attempts</div>
+                    </div>
+                    <div class="glass-card stat-card" style="padding: 1.25rem;">
+                        <div class="stat-value teal">{{ summary.success_rate }}%</div>
+                        <div class="stat-label">Match Success Rate</div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-between align-center flex-wrap gap-2" style="background: rgba(255,255,255,0.03); padding: 1rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                    <div>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Enrolled Face Users:</span>
+                        <strong style="color: var(--text-primary); font-size: 1rem; margin-left: 0.5rem;">{{ summary.total_face_users }} Users</strong>
+                    </div>
+                    <div>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">Today's Logins:</span>
+                        <strong style="color: var(--secondary); font-size: 1rem; margin-left: 0.5rem;">{{ summary.today_attempts }} ({{ summary.today_success_rate }}% Success)</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gesture Verification Breakdown -->
+            <div class="glass-card mb-3">
+                <h4 class="mb-2" style="font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>🎭</span> Gesture Verification Breakdown
+                </h4>
+
+                {% if summary.gesture_stats %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Gesture Action</th>
+                                <th>Total Attempts</th>
+                                <th>Verified Pass</th>
+                                <th>Failed</th>
+                                <th>Pass Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for g in summary.gesture_stats %}
+                            <tr>
+                                <td>
+                                    <strong style="color: var(--text-primary); text-transform: capitalize;">
+                                        {% if g.gesture == 'smile' %}😊 Smile
+                                        {% elif g.gesture == 'blink' %}😉 Eye Blink
+                                        {% elif g.gesture == 'look_left' %}👈 Turn Head Left
+                                        {% elif g.gesture == 'look_right' %}👉 Turn Head Right
+                                        {% elif g.gesture == 'look_up' %}👆 Look Up
+                                        {% elif g.gesture == 'look_down' %}👇 Look Down
+                                        {% else %}🎭 {{ g.gesture }}{% endif %}
+                                    </strong>
+                                </td>
+                                <td>{{ g.total }}</td>
+                                <td><span class="badge badge-success">{{ g.verified }}</span></td>
+                                <td>
+                                    {% if g.failed > 0 %}
+                                    <span class="badge badge-error">{{ g.failed }}</span>
+                                    {% else %}
+                                    <span style="color: var(--text-muted);">0</span>
+                                    {% endif %}
+                                </td>
+                                <td style="width: 180px;">
+                                    <div class="d-flex align-center gap-1">
+                                        <div style="flex: 1; height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden;">
+                                            <div style="height: 100%; width: {{ g.pass_rate }}%; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 3px;"></div>
+                                        </div>
+                                        <span style="font-size: 0.8rem; font-weight: 600; min-width: 45px; text-align: right;">{{ g.pass_rate }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state" style="padding: 1.5rem;">
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">No gesture verification data logged yet.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Top Facial Recognition Users -->
+            <div class="glass-card mb-3">
+                <div class="d-flex justify-between align-center mb-2">
+                    <h4 style="font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>👤</span> Top Users by Facial Access
+                    </h4>
+                    <a href="{{ url_for('admin.admin_users') }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">
+                        Manage Users →
+                    </a>
+                </div>
+
+                {% if summary.user_facial_stats %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Registered Email</th>
+                                <th>Total Logins</th>
+                                <th>Success Count</th>
+                                <th>Last Facial Access</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in summary.user_facial_stats %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-center gap-1">
+                                        <div class="user-avatar" style="width: 28px; height: 28px; font-size: 0.75rem;">
+                                            {{ u.name[0] | upper if u.name else 'U' }}
+                                        </div>
+                                        <strong>{{ u.name }}</strong>
+                                    </div>
+                                </td>
+                                <td style="color: var(--text-secondary); font-size: 0.85rem;">{{ u.email }}</td>
+                                <td>{{ u.total_logins }}</td>
+                                <td>
+                                    <span class="badge badge-success">{{ u.success_logins or 0 }}</span>
+                                </td>
+                                <td style="color: var(--text-muted); font-size: 0.82rem;">{{ u.last_access or 'Never' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state" style="padding: 1.5rem;">
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">No user access statistics available.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Recent Facial Access Log Stream -->
+            <div class="glass-card">
+                <div class="d-flex justify-between align-center mb-2">
+                    <h4 style="font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <span>📋</span> Recent Facial Recognition Logs
+                    </h4>
+                    <a href="{{ url_for('admin.admin_logs') }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">
+                        Full Logs Logbook →
+                    </a>
+                </div>
+
+                {% if summary.recent_facial_logs %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Access Status</th>
+                                <th>Gesture</th>
+                                <th>Outcome</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in summary.recent_facial_logs %}
+                            <tr>
+                                <td>{{ log.user_name or 'Unknown User' }}</td>
+                                <td>
+                                    <span class="badge {% if log.status == 'Success' %}badge-success{% else %}badge-error{% endif %}">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                                <td>{{ log.gesture_type or '—' }}</td>
+                                <td>
+                                    {% if log.gesture_result %}
+                                    <span class="badge {% if log.gesture_result == 'Verified' %}badge-success{% else %}badge-error{% endif %}">
+                                        {{ log.gesture_result }}
+                                    </span>
+                                    {% else %}—{% endif %}
+                                </td>
+                                <td style="color: var(--text-muted); font-size: 0.82rem;">{{ log.login_time }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state" style="padding: 1.5rem;">
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">No facial recognition logs recorded.</p>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchSettingsTab(event, sectionId) {
+    const section = document.getElementById(sectionId);
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnTestEmail = document.getElementById('btn-test-email');
+    const testResult = document.getElementById('test-email-result');
+
+    if (btnTestEmail) {
+        btnTestEmail.addEventListener('click', async () => {
+            btnTestEmail.disabled = true;
+            btnTestEmail.textContent = 'Sending...';
+            testResult.classList.add('hidden');
+
+            try {
+                const res = await fetch('/admin/settings/test-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+
+                testResult.classList.remove('hidden');
+                if (res.ok && data.success) {
+                    testResult.className = 'status-panel success mt-2';
+                    testResult.textContent = data.message;
+                } else {
+                    testResult.className = 'status-panel warning mt-2';
+                    testResult.textContent = data.message || 'Email delivery failed.';
+                }
+            } catch (e) {
+                testResult.classList.remove('hidden');
+                testResult.className = 'status-panel error mt-2';
+                testResult.textContent = 'Error connecting to server.';
+            } finally {
+                btnTestEmail.disabled = false;
+                btnTestEmail.textContent = '✉️ Send Test OTP';
+            }
+        });
+    }
+});
+</script>
+
+<style>
+.admin-settings-grid {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 992px) {
+    .admin-settings-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

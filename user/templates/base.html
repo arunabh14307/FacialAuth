@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Facial Recognition Login System with Gesture-Based Authentication — Secure biometric access control">
+    <title>{% block title %}FaceGuard — Secure Authentication{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="{{ url_for('auth.index') }}" class="nav-brand">
+            <div class="brand-icon">🛡️</div>
+            <span>FaceGuard</span>
+        </a>
+        <div class="nav-right">
+            <ul class="nav-links">
+                <li><a href="{{ url_for('auth.index') }}" class="{% if request.endpoint == 'auth.index' %}active{% endif %}">Home</a></li>
+                <li><a href="{{ url_for('auth.register') }}" class="{% if request.endpoint == 'auth.register' %}active{% endif %}">Register</a></li>
+                <li><a href="{{ url_for('auth.login') }}" class="{% if request.endpoint == 'auth.login' %}active{% endif %}">Login</a></li>
+                {% if session.get('logged_in') %}
+                <li><a href="{{ url_for('auth.dashboard') }}" class="{% if request.endpoint == 'auth.dashboard' %}active{% endif %}">Dashboard</a></li>
+                {% endif %}
+            </ul>
+            <!-- Separate Standalone Secret Shield Trigger -->
+            <div class="secret-shield-badge" id="admin-shield-trigger" title="System Security Status (7 Taps for Admin Access)" style="cursor: pointer; user-select: none;">
+                🛡️
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Page Content -->
+    <main class="page-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Admin Secret Access Modal -->
+    <div id="admin-access-modal" class="modal-overlay hidden">
+        <div class="modal-card admin-modal">
+            <button class="modal-close" id="admin-modal-close" type="button" aria-label="Close modal">&times;</button>
+
+            <!-- Step 1: Admin Credentials -->
+            <div id="admin-step-credentials">
+                <div class="modal-header text-center">
+                    <div class="modal-icon text-glow">🔐</div>
+                    <h3>Admin Verification</h3>
+                    <p>Enter administrator credentials to send OTP.</p>
+                </div>
+                <div id="admin-cred-error" class="modal-alert error hidden"></div>
+                <form id="admin-cred-form">
+                    <div class="form-group">
+                        <label for="admin-username">Admin Username</label>
+                        <input type="text" id="admin-username" class="form-input" placeholder="e.g. admin" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="admin-password">Admin Password</label>
+                        <input type="password" id="admin-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" id="btn-verify-cred" class="btn btn-primary btn-block">Verify Credentials & Send OTP</button>
+                </form>
+            </div>
+
+            <!-- Step 2: OTP Verification -->
+            <div id="admin-step-otp" class="hidden">
+                <div class="modal-header text-center">
+                    <div class="modal-icon text-glow">📧</div>
+                    <h3>Enter OTP Code</h3>
+                    <p id="otp-sent-notice">An OTP has been dispatched to your email.</p>
+                </div>
+                <div id="admin-otp-error" class="modal-alert error hidden"></div>
+                <div id="admin-otp-success" class="modal-alert success hidden"></div>
+                <form id="admin-otp-form">
+                    <div class="form-group">
+                        <label for="admin-otp-input">6-Digit One-Time Password</label>
+                        <input type="text" id="admin-otp-input" class="form-input text-center otp-input-lg" maxlength="6" placeholder="123456" required autocomplete="one-time-code" pattern="\d{6}">
+                    </div>
+                    <button type="submit" id="btn-verify-otp" class="btn btn-primary btn-block">Verify OTP & Access Portal</button>
+                    <button type="button" id="btn-resend-otp" class="btn btn-secondary btn-block mt-2">Resend OTP</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/logout_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/shield_trigger.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

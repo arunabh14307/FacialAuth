@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Login — FaceGuard{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container wide">
+        <div class="auth-header">
+            <h2>🔐 Secure Login</h2>
+            <p>Authenticate with your face and a gesture challenge</p>
+        </div>
+
+        <!-- Step Indicators -->
+        <div class="login-steps">
+            <div class="step active" id="step-1">
+                <div class="step-number">1</div>
+                <span>Face Recognition</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step" id="step-2">
+                <div class="step-number">2</div>
+                <span>Gesture Verification</span>
+            </div>
+        </div>
+
+        <!-- Status Container -->
+        <div id="status-container" class="hidden"></div>
+
+        <div class="glass-card">
+            <!-- Camera Container (Shared across both steps) -->
+            <div class="camera-container">
+                <video id="login-video" autoplay playsinline muted></video>
+                <div class="camera-overlay">
+                    <div class="camera-scan-line"></div>
+                    <div class="camera-corners"><span></span></div>
+                </div>
+                <div class="camera-status" id="camera-status">Camera Off</div>
+            </div>
+
+            <!-- Face Detection Section -->
+            <div id="face-section">
+                <div class="text-center mt-3">
+                    <button id="start-login-btn" class="btn btn-primary btn-lg">
+                        🔐 Start Authentication
+                    </button>
+                    <p class="mt-2" style="color: var(--text-muted); font-size: 0.85rem;">
+                        Position your face clearly in the camera frame
+                    </p>
+                </div>
+            </div>
+
+            <!-- Gesture Challenge Section (hidden initially) -->
+            <div id="gesture-section" class="hidden">
+                <div class="gesture-challenge">
+                    <div class="gesture-emoji" id="gesture-emoji">🎯</div>
+                    <div class="gesture-name" id="gesture-name">Gesture Challenge</div>
+                    <p class="gesture-instruction" id="gesture-instruction">Please perform the gesture shown above</p>
+
+                    <div class="gesture-timer" id="gesture-timer">10</div>
+
+                    <div class="d-flex gap-2 mt-2" style="justify-content: center;">
+                        <button id="verify-gesture-btn" class="btn btn-primary">
+                            ✓ Verify Now
+                        </button>
+                        <button id="retry-btn" class="btn btn-secondary">
+                            🔄 Start Over
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-3">
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Don't have an account? <a href="{{ url_for('auth.register') }}">Register here</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+{% endblock %}

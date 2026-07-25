@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin Dashboard — FaceGuard{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem;">
+    <div class="dashboard-header">
+        <div>
+            <h2>📊 Admin Dashboard</h2>
+            <p style="color: var(--text-secondary);">System overview and statistics</p>
+        </div>
+        <a href="{{ url_for('admin.admin_logout') }}" class="btn btn-secondary" style="font-size: 0.85rem;">
+            Logout Admin
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="glass-card stat-card">
+            <div class="stat-value purple" data-count="{{ stats.total_users }}">{{ stats.total_users }}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        <div class="glass-card stat-card">
+            <div class="stat-value teal" data-count="{{ stats.today_logins }}">{{ stats.today_logins }}</div>
+            <div class="stat-label">Today's Login Attempts</div>
+        </div>
+        <div class="glass-card stat-card">
+            <div class="stat-value green" data-count="{{ stats.today_success }}">{{ stats.today_success }}</div>
+            <div class="stat-label">Successful Logins</div>
+        </div>
+        <div class="glass-card stat-card">
+            <div class="stat-value pink">{{ stats.success_rate }}%</div>
+            <div class="stat-label">Success Rate</div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="glass-card mb-3">
+        <h3 class="mb-2">⚡ Quick Actions</h3>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('admin.admin_users') }}" class="btn btn-primary">
+                👥 Manage Users
+            </a>
+            <a href="{{ url_for('admin.admin_logs') }}" class="btn btn-secondary">
+                📋 View Logs
+            </a>
+            <a href="{{ url_for('admin.admin_logs') }}?status=Failed" class="btn btn-danger btn-sm">
+                ⚠ Failed Attempts
+            </a>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="glass-card">
+        <div class="d-flex justify-between align-center mb-2">
+            <h3>📋 Recent Login Activity</h3>
+            <a href="{{ url_for('admin.admin_logs') }}" class="btn btn-secondary btn-sm">View All →</a>
+        </div>
+
+        {% if logs %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Gesture</th>
+                        <th>Result</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.user_name or 'Unknown' }}</td>
+                        <td>{{ log.login_time }}</td>
+                        <td>
+                            <span class="badge {% if log.status == 'Success' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ log.status }}
+                            </span>
+                        </td>
+                        <td>{{ log.gesture_type or '—' }}</td>
+                        <td>
+                            {% if log.gesture_result %}
+                            <span class="badge {% if log.gesture_result == 'Verified' %}badge-success{% else %}badge-error{% endif %}">
+                                {{ log.gesture_result }}
+                            </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td style="color: var(--text-muted);">{{ log.ip_address or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <p>No login activity recorded yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

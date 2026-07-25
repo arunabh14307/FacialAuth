@@ -1,0 +1,37 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin Login — FaceGuard{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container" style="max-width: 420px;">
+        <div class="auth-header">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🛡️</div>
+            <h2>Admin Login</h2>
+            <p>Access the administration panel</p>
+        </div>
+
+        <div class="glass-card">
+            <form method="POST" action="{{ url_for('admin.admin_login') }}">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input type="text" id="username" name="username" class="form-input" placeholder="Enter admin username" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-full mt-2">
+                    🔐 Login
+                </button>
+            </form>
+        </div>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('auth.index') }}" style="color: var(--text-muted); font-size: 0.85rem;">← Back to main site</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
