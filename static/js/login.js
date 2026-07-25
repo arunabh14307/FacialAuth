@@ -180,8 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 window.location.href = result.redirect || '/dashboard';
             }, 2000);
+        } else if (result.message) {
+            showStatus('status-container', result.message, 'warning');
         }
-        // If not detected, keep trying (auto-check loop handles retry)
     }
 
     function resetLogin() {

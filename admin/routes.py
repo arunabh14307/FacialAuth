@@ -54,10 +54,32 @@ def admin_login():
         admin = db.verify_admin(username, password)
 
         if admin:
-            session['admin_logged_in'] = True
-            session['admin_username'] = admin['username']
-            flash('Welcome back, Admin!', 'success')
-            return redirect(url_for('admin.admin_dashboard'))
+            admin_email = admin.get('email') or current_app.config.get('DEFAULT_ADMIN_EMAIL', 'admin@faceguard.local')
+            otp_code = generate_otp(6)
+
+            session['pending_admin_otp'] = {
+                'otp': otp_code,
+                'username': admin['username'],
+                'email': admin_email,
+                'created_at': time.time()
+            }
+
+            # Refresh latest persistent system settings into config
+            try:
+                saved_settings = db.get_all_settings()
+                for key, val in saved_settings.items():
+                    if key == 'SMTP_PORT':
+                        current_app.config[key] = int(val) if val and val.isdigit() else 587
+                    elif key == 'SMTP_USE_TLS':
+                        current_app.config[key] = val.lower() == 'true'
+                    else:
+                        current_app.config[key] = val
+            except Exception:
+                pass
+
+            success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
+            flash(f"Credentials verified. OTP sent to {mask_email(admin_email)}.", "info")
+            return render_template('admin/login.html', step='otp', masked_email=mask_email(admin_email))
         else:
             flash('Invalid credentials.', 'error')
 

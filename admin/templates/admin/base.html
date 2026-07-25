@@ -20,6 +20,7 @@
             <li><a href="{{ url_for('admin.admin_users') }}" class="{% if request.endpoint == 'admin.admin_users' %}active{% endif %}">Users</a></li>
             <li><a href="{{ url_for('admin.admin_logs') }}" class="{% if request.endpoint == 'admin.admin_logs' %}active{% endif %}">Logs</a></li>
             <li><a href="{{ url_for('admin.admin_settings') }}" class="{% if request.endpoint == 'admin.admin_settings' %}active{% endif %}">Settings</a></li>
+            <li><a href="{{ url_for('admin.admin_logout') }}" class="direct-logout" style="color: var(--accent);">Logout</a></li>
             {% endif %}
             <li><a href="{{ url_for('auth.index') }}" style="font-size: 0.8rem; opacity: 0.6;">← Main Site</a></li>
         </ul>

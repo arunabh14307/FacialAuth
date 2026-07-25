@@ -84,6 +84,9 @@ def send_otp_email(recipient_email, otp_code, config):
     if '@' in smtp_server:
         smtp_server = smtp_server.split('@')[-1]
 
+    if smtp_server.lower() in ['gmail.com', 'outlook.com', 'office365.com', 'yahoo.com']:
+        smtp_server = 'smtp.' + smtp_server.lower()
+
     mail_from = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or 'noreply@faceguard.local'
 
     subject = "FaceGuard Admin Access — One-Time Verification Password (OTP)"

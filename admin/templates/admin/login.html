@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 showMsg('OTP Verified! Redirecting to Dashboard...', 'success');
                 setTimeout(() => {
-                    window.location.href = data.redirect || '/admin/dashboard';
+                    window.location.href = data.redirect_url || data.redirect || '/admin/dashboard';
                 }, 1000);
             } else {
                 showMsg(data.message || 'Invalid OTP code.', 'error');

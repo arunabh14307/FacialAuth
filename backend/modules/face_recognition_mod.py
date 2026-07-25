@@ -165,8 +165,11 @@ def match_face(encoding, stored_encodings, tolerance=0.6):
         return False, None, 0.0, "Could not compare faces."
 
     # SFace benchmark cosine similarity threshold is 0.363
-    # Use 0.320 for flexible real-world webcam matching
-    match_threshold = 0.320
+    # Use tolerance parameter if configured between 0.1 and 0.9, otherwise default to 0.320
+    if tolerance is not None and 0.1 <= float(tolerance) <= 0.9:
+        match_threshold = float(tolerance)
+    else:
+        match_threshold = 0.320
 
     confidence = max(0.0, min(1.0, float(best_similarity)))
 

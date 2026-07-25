@@ -19,10 +19,12 @@
         <div class="nav-right">
             <ul class="nav-links">
                 <li><a href="{{ url_for('auth.index') }}" class="{% if request.endpoint == 'auth.index' %}active{% endif %}">Home</a></li>
+                {% if not session.get('logged_in') %}
                 <li><a href="{{ url_for('auth.register') }}" class="{% if request.endpoint == 'auth.register' %}active{% endif %}">Register</a></li>
                 <li><a href="{{ url_for('auth.login') }}" class="{% if request.endpoint == 'auth.login' %}active{% endif %}">Login</a></li>
-                {% if session.get('logged_in') %}
+                {% else %}
                 <li><a href="{{ url_for('auth.dashboard') }}" class="{% if request.endpoint == 'auth.dashboard' %}active{% endif %}">Dashboard</a></li>
+                <li><a href="{{ url_for('auth.logout') }}" class="direct-logout" style="color: var(--accent);">Logout</a></li>
                 {% endif %}
             </ul>
             <!-- Separate Standalone Secret Shield Trigger -->

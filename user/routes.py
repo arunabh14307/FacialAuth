@@ -174,6 +174,9 @@ def api_login_detect():
     session['login_confidence'] = confidence
 
     user = db.get_user_by_id(user_id)
+    if not user or not user.get('is_active', 1):
+        db.log_login_attempt(user_id, 'Failed', None, None, request.remote_addr)
+        return jsonify({'success': False, 'message': 'Account is inactive or does not exist.'}), 401
 
     return jsonify({
         'success': True,
@@ -231,10 +234,11 @@ def api_login_gesture():
         db.log_login_attempt(user_id, 'Success', target_gesture, 'Verified', request.remote_addr)
 
         user = db.get_user_by_id(user_id)
+        user_name = user['name'] if user else 'User'
 
         return jsonify({
             'success': True,
-            'message': f'Authentication successful! Welcome, {user["name"]}.',
+            'message': f'Authentication successful! Welcome, {user_name}.',
             'redirect': url_for('auth.dashboard')
         })
     else:
