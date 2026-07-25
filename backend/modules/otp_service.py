@@ -43,20 +43,34 @@ FaceGuard Security Team
 """
 
     if smtp_server:
+        port = int(config.get('SMTP_PORT', 587))
+        username = config.get('SMTP_USERNAME', '').strip()
+        password = config.get('SMTP_PASSWORD', '').replace(' ', '').strip()
+        use_tls = config.get('SMTP_USE_TLS', True)
+        if isinstance(use_tls, str):
+            use_tls = use_tls.lower() == 'true'
+
+        msg = MIMEMultipart()
+        msg['From'] = mail_from
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Strategy 1: Direct SSL Port 465 (Bypasses STARTTLS firewall blocks)
+        if port == 465 or 'gmail' in smtp_server.lower():
+            try:
+                server = smtplib.SMTP_SSL(smtp_server, 465, timeout=12)
+                if username and password:
+                    server.login(username, password)
+                server.sendmail(mail_from, [recipient_email], msg.as_string())
+                server.quit()
+                print(f"[OTP SERVICE SUCCESS] Real email sent to {recipient_email} via SMTP_SSL (port 465)")
+                return True, False, f"OTP email sent successfully to {recipient_email}"
+            except Exception as e:
+                print(f"[OTP SERVICE WARN] Port 465 SSL failed: {e}. Trying TLS port {port}...")
+
+        # Strategy 2: TLS Port 587
         try:
-            port = int(config.get('SMTP_PORT', 587))
-            username = config.get('SMTP_USERNAME', '').strip()
-            password = config.get('SMTP_PASSWORD', '').replace(' ', '').strip()
-            use_tls = config.get('SMTP_USE_TLS', True)
-            if isinstance(use_tls, str):
-                use_tls = use_tls.lower() == 'true'
-
-            msg = MIMEMultipart()
-            msg['From'] = mail_from
-            msg['To'] = recipient_email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
-
             server = smtplib.SMTP(smtp_server, port, timeout=12)
             if use_tls:
                 server.starttls()
@@ -65,7 +79,7 @@ FaceGuard Security Team
 
             server.sendmail(mail_from, [recipient_email], msg.as_string())
             server.quit()
-            print(f"[OTP SERVICE SUCCESS] Real email sent to {recipient_email} via SMTP ({smtp_server})")
+            print(f"[OTP SERVICE SUCCESS] Real email sent to {recipient_email} via SMTP ({smtp_server}:{port})")
             return True, False, f"OTP email sent successfully to {recipient_email}"
         except Exception as e:
             error_msg = str(e)
