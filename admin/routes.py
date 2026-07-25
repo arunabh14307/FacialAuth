@@ -6,7 +6,9 @@ import time
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
 from backend.modules.otp_service import generate_otp, send_otp_email
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/admin', template_folder='templates')
+import os
+admin_template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+admin_bp = Blueprint('admin', __name__, url_prefix='/admin', template_folder=admin_template_dir)
 
 
 def get_db():

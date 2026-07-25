@@ -10,7 +10,8 @@ from backend.modules.face_detection import detect_face, decode_base64_image
 from backend.modules.face_recognition_mod import encode_face, match_face
 from backend.modules.gesture_detection import detect_gesture, get_random_gesture, get_gesture_display_name, get_gesture_instruction
 
-auth_bp = Blueprint('auth', __name__)
+user_template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+auth_bp = Blueprint('auth', __name__, template_folder=user_template_dir)
 
 
 def get_db():

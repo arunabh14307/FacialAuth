@@ -13,7 +13,10 @@ from admin.routes import admin_bp
 
 def create_app():
     """Create and configure the Flask application."""
-    app = Flask(__name__, template_folder='user/templates')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    template_dir = os.path.join(base_dir, 'user', 'templates')
+    static_dir = os.path.join(base_dir, 'static')
+    app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
     # Load configuration
     app.config.from_object(Config)
