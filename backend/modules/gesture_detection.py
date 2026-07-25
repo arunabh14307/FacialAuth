@@ -108,9 +108,12 @@ def _detect_head_direction(landmarks):
     return results
 
 def detect_gesture(frame, target_gesture):
+    if frame is None:
+        return False, 0.0, "Invalid or empty camera frame."
+
     detector = _get_detector()
-    if frame is None or detector is None:
-        return False, 0.0, "Invalid image data or model not loaded"
+    if detector is None:
+        return False, 0.0, "Gesture verification AI model is unavailable on this server."
 
     if target_gesture not in SUPPORTED_GESTURES:
         return False, 0.0, f"Unsupported gesture: {target_gesture}"

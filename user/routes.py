@@ -139,7 +139,10 @@ def api_login_detect():
     try:
         frame = decode_base64_image(data['image'])
     except Exception:
-        return jsonify({'success': False, 'message': 'Invalid image data'}), 400
+        frame = None
+
+    if frame is None:
+        return jsonify({'success': False, 'message': 'Unable to process camera image. Please check your webcam input.'}), 400
 
     # Detect face
     success, face_locations, message = detect_face(frame)
@@ -204,7 +207,10 @@ def api_login_gesture():
     try:
         frame = decode_base64_image(data['image'])
     except Exception:
-        return jsonify({'success': False, 'message': 'Invalid image data'}), 400
+        frame = None
+
+    if frame is None:
+        return jsonify({'success': False, 'message': 'Unable to process camera image. Please check your webcam input.'}), 400
 
     # Detect gesture
     detected, confidence, message = detect_gesture(frame, target_gesture)

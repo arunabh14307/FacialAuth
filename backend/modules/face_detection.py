@@ -99,13 +99,13 @@ def detect_face(frame):
             - message: str
     """
     if frame is None:
-        return False, [], "Invalid image data"
+        return False, [], "Invalid or empty camera frame."
 
     h, w, _ = frame.shape
     detector = _get_detector((w, h))
 
     if detector is None:
-        return False, [], "Face detector model not found."
+        return False, [], "Face detector AI model is unavailable on this server."
 
     # YuNet expects BGR format
     _, faces = detector.detect(frame)

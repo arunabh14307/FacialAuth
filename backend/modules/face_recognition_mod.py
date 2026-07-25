@@ -54,7 +54,7 @@ def encode_face(frame):
             - message: str
     """
     if frame is None:
-        return False, None, "Invalid image data"
+        return False, None, "Invalid or empty camera frame."
 
     # Step 1: Detect face using YuNet to get the landmarks needed for alignment
     success, faces, msg = detect_face(frame)
