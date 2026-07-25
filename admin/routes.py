@@ -133,7 +133,10 @@ def verify_credentials():
     # Dispatch OTP email
     success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
 
-    display_message = f"OTP sent to {mask_email(admin_email)}" if not is_fallback else f"OTP Status: {msg}"
+    if not is_fallback:
+        display_message = f"OTP sent to {mask_email(admin_email)}"
+    else:
+        display_message = f"Cloud network SMTP restricted on server. Your verification OTP code is: {otp_code}"
 
     return jsonify({
         'success': True,
