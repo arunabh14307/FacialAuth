@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+.env
+.pytest_cache/
+.vscode/
+.idea/
+data/face_encodings/*
+!data/face_encodings/.gitkeep

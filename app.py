@@ -21,29 +21,45 @@ def create_app():
     app.config['FACE_ENCODING_DIR'] = Config.FACE_ENCODING_DIR
     app.config['FACE_RECOGNITION_TOLERANCE'] = Config.FACE_RECOGNITION_TOLERANCE
 
-    # Initialize database
-    db = Database(Config.DATABASE_PATH)
-    db.init_db()
+    # Initialize database with fallback for read-only serverless environments (Vercel)
+    db_path = app.config.get('DATABASE_PATH', Config.DATABASE_PATH)
+    try:
+        db = Database(db_path)
+        db.init_db()
+    except Exception as e:
+        tmp_db_path = '/tmp/database.db'
+        db = Database(tmp_db_path)
+        db.init_db()
+
     app.config['DB_INSTANCE'] = db
 
     # Load persistent system settings (e.g. SMTP config) from database into app.config
-    saved_settings = db.get_all_settings()
-    for key, val in saved_settings.items():
-        if key == 'SMTP_PORT':
-            app.config[key] = int(val) if val and val.isdigit() else 587
-        elif key == 'SMTP_USE_TLS':
-            app.config[key] = val.lower() == 'true'
-        else:
-            app.config[key] = val
+    try:
+        saved_settings = db.get_all_settings()
+        for key, val in saved_settings.items():
+            if key == 'SMTP_PORT':
+                app.config[key] = int(val) if val and val.isdigit() else 587
+            elif key == 'SMTP_USE_TLS':
+                app.config[key] = val.lower() == 'true'
+            else:
+                app.config[key] = val
+    except Exception:
+        pass
 
     # Create default admin if none exists
-    if not db.admin_exists():
-        db.create_admin(Config.DEFAULT_ADMIN_USERNAME, Config.DEFAULT_ADMIN_PASSWORD, Config.DEFAULT_ADMIN_EMAIL)
-        print(f"[INFO] Default admin created: {Config.DEFAULT_ADMIN_USERNAME} ({Config.DEFAULT_ADMIN_EMAIL})")
+    try:
+        if not db.admin_exists():
+            db.create_admin(Config.DEFAULT_ADMIN_USERNAME, Config.DEFAULT_ADMIN_PASSWORD, Config.DEFAULT_ADMIN_EMAIL)
+            print(f"[INFO] Default admin created: {Config.DEFAULT_ADMIN_USERNAME} ({Config.DEFAULT_ADMIN_EMAIL})")
+    except Exception:
+        pass
 
     # Ensure required directories exist
-    os.makedirs(Config.FACE_ENCODING_DIR, exist_ok=True)
-    os.makedirs(os.path.join(os.path.dirname(__file__), 'data'), exist_ok=True)
+    try:
+        os.makedirs(app.config.get('FACE_ENCODING_DIR', 'data/face_encodings'), exist_ok=True)
+        os.makedirs(os.path.join(os.path.dirname(__file__), 'data'), exist_ok=True)
+    except Exception:
+        pass
 
     # Register blueprints
     app.register_blueprint(auth_bp)
@@ -52,8 +68,13 @@ def create_app():
     return app
 
 
+# Top-level application export for WSGI deployment servers (Vercel, Render, Gunicorn, AWS)
+app = create_app()
+application = app
+handler = app
+
+
 if __name__ == '__main__':
-    app = create_app()
     print("\n" + "=" * 60)
     print("  Facial Recognition Login System")
     print("  with Gesture-Based Authentication")

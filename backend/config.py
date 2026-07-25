@@ -7,11 +7,13 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'facial-recog-secret-key-change-in-production')
 
     # Database
-    DATABASE_PATH = os.path.join(BASE_DIR, 'database.db')
+    if os.environ.get('VERCEL') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME') or os.environ.get('SERVERLESS'):
+        DATABASE_PATH = '/tmp/database.db'
+        FACE_ENCODING_DIR = '/tmp/face_encodings'
+    else:
+        DATABASE_PATH = os.environ.get('DATABASE_PATH', os.path.join(BASE_DIR, 'database.db'))
+        FACE_ENCODING_DIR = os.environ.get('FACE_ENCODING_DIR', os.path.join(BASE_DIR, 'data', 'face_encodings'))
 
-
-    # Face Recognition
-    FACE_ENCODING_DIR = os.path.join(BASE_DIR, 'data', 'face_encodings')
     FACE_RECOGNITION_TOLERANCE = 0.6  # Lower = stricter matching
     FACE_RECOGNITION_MODEL = 'hog'    # 'hog' (CPU) or 'cnn' (GPU)
 
