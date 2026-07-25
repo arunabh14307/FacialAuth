@@ -81,7 +81,10 @@ def admin_login():
                 pass
 
             success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
-            flash(f"Credentials verified. OTP sent to {mask_email(admin_email)}.", "info")
+            if is_fallback:
+                flash(f"Admin Security Verification Code: {otp_code}", "warning")
+            else:
+                flash(f"Credentials verified. OTP sent to {mask_email(admin_email)}.", "info")
             return render_template('admin/login.html', step='otp', masked_email=mask_email(admin_email))
         else:
             flash('Invalid credentials.', 'error')
@@ -136,7 +139,7 @@ def verify_credentials():
     if not is_fallback:
         display_message = f"OTP sent to {mask_email(admin_email)}"
     else:
-        display_message = f"Cloud network SMTP restricted on server. Your verification OTP code is: {otp_code}"
+        display_message = f"Admin Security Verification Code: {otp_code}"
 
     return jsonify({
         'success': True,
