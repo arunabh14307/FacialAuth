@@ -1,0 +1,12 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+database.db
+data/
+*.task
+*.log
+.vercel/
