@@ -80,14 +80,16 @@ def send_otp_email(recipient_email, otp_code, config):
     Send OTP code to the recipient email address via HTTPS API or SMTP.
     Returns tuple: (success: bool, is_fallback: bool, message: str)
     """
-    smtp_server = config.get('SMTP_SERVER', '').strip()
+    smtp_server = (config.get('SMTP_SERVER') or os.environ.get('SMTP_SERVER') or 'smtp.gmail.com').strip()
     if '@' in smtp_server:
         smtp_server = smtp_server.split('@')[-1]
 
     if smtp_server.lower() in ['gmail.com', 'outlook.com', 'office365.com', 'yahoo.com']:
         smtp_server = 'smtp.' + smtp_server.lower()
 
-    mail_from = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or 'noreply@faceguard.local'
+    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or '').strip()
+    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or '').replace(' ', '').strip()
+    mail_from = config.get('MAIL_FROM_ADDRESS') or username or 'noreply@faceguard.local'
 
     subject = "FaceGuard Admin Access — One-Time Verification Password (OTP)"
     body = f"""Hello Admin,
@@ -111,8 +113,6 @@ FaceGuard Security Team
 
     if smtp_server:
         port = int(config.get('SMTP_PORT', 587))
-        username = config.get('SMTP_USERNAME', '').strip()
-        password = config.get('SMTP_PASSWORD', '').replace(' ', '').strip()
         use_tls = config.get('SMTP_USE_TLS', True)
         if isinstance(use_tls, str):
             use_tls = use_tls.lower() == 'true'
