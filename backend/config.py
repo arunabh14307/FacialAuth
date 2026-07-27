@@ -34,18 +34,18 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload
 
     # Admin defaults
-    DEFAULT_ADMIN_USERNAME = 'admin'
-    DEFAULT_ADMIN_PASSWORD = 'admin123'
-    DEFAULT_ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'arunabhsingh10@gmail.com')
+    DEFAULT_ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+    DEFAULT_ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    DEFAULT_ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@faceguard.local')
 
-    # OTP & Email settings (Gmail SSL Port 465 Primary)
+    # OTP & Email settings
     OTP_EXPIRY_SECONDS = 300  # 5 minutes
     SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
     SMTP_PORT = int(os.environ.get('SMTP_PORT', 465))
-    SMTP_USERNAME = os.environ.get('SMTP_USERNAME', 'arun12507086@gmail.com')
-    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', 'rmve' + 'phrz' + 'vgeu' + 'etkj')
+    SMTP_USERNAME = os.environ.get('SMTP_USERNAME', '')
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
     SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'false').lower() == 'true'
-    MAIL_FROM_ADDRESS = os.environ.get('MAIL_FROM_ADDRESS', 'arun12507086@gmail.com')
+    MAIL_FROM_ADDRESS = os.environ.get('MAIL_FROM_ADDRESS', '')
     BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
     RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 

@@ -85,29 +85,33 @@ class Database:
             )
         ''')
 
-        # Ensure default admin user is always seeded with real email
+        # Seed default admin user ONLY if no admin accounts exist
         from backend.config import Config
         from werkzeug.security import generate_password_hash
-        
-        # Ensure nightmare & admin accounts are seeded and synced with active email & password
-        pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
-        for uname in ['nightmare', 'admin']:
-            cursor.execute("SELECT COUNT(*) FROM admins WHERE LOWER(username) = LOWER(?)", (uname,))
-            if cursor.fetchone()[0] == 0:
-                cursor.execute(
-                    'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
-                    (uname, pwd_hash, 'arunabhsingh10@gmail.com')
-                )
-            else:
-                cursor.execute("UPDATE admins SET email = ?, password_hash = ? WHERE LOWER(username) = LOWER(?)", ('arunabhsingh10@gmail.com', pwd_hash, uname))
 
-        # Ensure active SMTP credentials in database settings
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_SERVER', ?)", ('smtp.gmail.com',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PORT', ?)", ('465',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USERNAME', ?)", ('arun12507086@gmail.com',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PASSWORD', ?)", ('rmve' + 'phrz' + 'vgeu' + 'etkj',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('MAIL_FROM_ADDRESS', ?)", ('arun12507086@gmail.com',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USE_TLS', ?)", ('true',))
+        cursor.execute("SELECT COUNT(*) FROM admins")
+        if cursor.fetchone()[0] == 0:
+            pwd_hash = generate_password_hash(Config.DEFAULT_ADMIN_PASSWORD)
+            default_email = Config.DEFAULT_ADMIN_EMAIL or 'admin@faceguard.local'
+            cursor.execute(
+                'INSERT INTO admins (username, password_hash, email) VALUES (?, ?, ?)',
+                (Config.DEFAULT_ADMIN_USERNAME, pwd_hash, default_email)
+            )
+
+        # Seed initial system settings ONLY if key does not exist yet (INSERT OR IGNORE)
+        initial_defaults = {
+            'SMTP_SERVER': Config.SMTP_SERVER or 'smtp.gmail.com',
+            'SMTP_PORT': str(Config.SMTP_PORT or '465'),
+            'SMTP_USERNAME': Config.SMTP_USERNAME or '',
+            'SMTP_PASSWORD': Config.SMTP_PASSWORD or '',
+            'MAIL_FROM_ADDRESS': Config.MAIL_FROM_ADDRESS or '',
+            'SMTP_USE_TLS': 'true' if Config.SMTP_USE_TLS else 'false'
+        }
+        for key, val in initial_defaults.items():
+            cursor.execute(
+                "INSERT OR IGNORE INTO system_settings (setting_key, setting_value) VALUES (?, ?)",
+                (key, val)
+            )
 
         conn.commit()
         conn.close()

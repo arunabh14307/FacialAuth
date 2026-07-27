@@ -23,9 +23,9 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
     # Strategy A: Brevo HTTP API
     if brevo_key:
         try:
-            sender_email = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or 'arunabhsingh10@gmail.com'
-            if 'faceguard.local' in sender_email or not '@' in sender_email:
-                sender_email = 'arunabhsingh10@gmail.com'
+            sender_email = config.get('MAIL_FROM_ADDRESS') or config.get('SMTP_USERNAME') or ''
+            if not '@' in sender_email:
+                sender_email = 'no-reply@faceguard.local'
 
             url = "https://api.brevo.com/v3/smtp/email"
             headers = {
@@ -91,9 +91,9 @@ def send_otp_email(recipient_email, otp_code, config):
     if smtp_server.lower() in ['gmail.com', 'outlook.com', 'office365.com', 'yahoo.com']:
         smtp_server = 'smtp.' + smtp_server.lower()
 
-    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or 'arun12507086@gmail.com').strip()
-    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or ('rmve' + 'phrz' + 'vgeu' + 'etkj')).replace(' ', '').strip()
-    mail_from = config.get('MAIL_FROM_ADDRESS') or os.environ.get('MAIL_FROM_ADDRESS') or 'arun12507086@gmail.com'
+    username = (config.get('SMTP_USERNAME') or os.environ.get('SMTP_USERNAME') or '').strip()
+    password = (config.get('SMTP_PASSWORD') or os.environ.get('SMTP_PASSWORD') or '').replace(' ', '').strip()
+    mail_from = config.get('MAIL_FROM_ADDRESS') or os.environ.get('MAIL_FROM_ADDRESS') or username
 
     subject = "FaceGuard Admin Access — One-Time Verification Password (OTP)"
     body = f"""Hello Admin,
