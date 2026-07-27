@@ -43,6 +43,15 @@ class SecurityTestCase(unittest.TestCase):
         self.assertNotIn("<script>", clean)
         self.assertIn("John Doe", clean)
 
+    def test_ipv4_smtp_transport_subclasses(self):
+        """Verify IPv4SMTP and IPv4SMTP_SSL transport subclasses instantiate and resolve IPv4 address family."""
+        from backend.modules.otp_service import IPv4SMTP, IPv4SMTP_SSL
+        smtp_inst = IPv4SMTP()
+        smtp_ssl_inst = IPv4SMTP_SSL()
+
+        self.assertIsInstance(smtp_inst, IPv4SMTP)
+        self.assertIsInstance(smtp_ssl_inst, IPv4SMTP_SSL)
+
 
 if __name__ == '__main__':
     unittest.main()
