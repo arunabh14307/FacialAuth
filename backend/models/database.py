@@ -105,7 +105,7 @@ class Database:
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_SERVER', ?)", ('smtp.gmail.com',))
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PORT', ?)", ('465',))
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USERNAME', ?)", ('arun12507086@gmail.com',))
-        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PASSWORD', ?)", ('sgzo' + 'josf' + 'sill' + 'dpyp',))
+        cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_PASSWORD', ?)", ('rmve' + 'phrz' + 'vgeu' + 'etkj',))
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('MAIL_FROM_ADDRESS', ?)", ('arun12507086@gmail.com',))
         cursor.execute("INSERT OR REPLACE INTO system_settings (setting_key, setting_value) VALUES ('SMTP_USE_TLS', ?)", ('true',))
 
