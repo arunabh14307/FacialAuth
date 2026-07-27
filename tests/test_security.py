@@ -43,10 +43,10 @@ class SecurityTestCase(unittest.TestCase):
         self.assertNotIn("<script>", clean)
         self.assertIn("John Doe", clean)
 
-    def test_ipv4_smtp_client_creator(self):
-        """Verify create_ipv4_smtp_client helper function exists and is callable."""
-        from backend.modules.otp_service import create_ipv4_smtp_client
-        self.assertTrue(callable(create_ipv4_smtp_client))
+    def test_send_otp_email_function(self):
+        """Verify send_otp_email entrypoint exists and is callable."""
+        from backend.modules.otp_service import send_otp_email
+        self.assertTrue(callable(send_otp_email))
 
 
 if __name__ == '__main__':

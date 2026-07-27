@@ -1,94 +1,17 @@
 """
 OTP & Email Delivery Engine — Multi-protocol SMTP & HTTP API Mail Dispatcher.
-Uses direct IPv4 socket creation (socket.AF_INET) attached to standard smtplib instances
-without subclassing or monkey-patching, providing robust 220 banner reading and stage timing.
+Uses standard Python smtplib (smtplib.SMTP_SSL & smtplib.SMTP) without overriding internal transport logic.
 """
 
 import random
 import string
 import smtplib
-import socket
-import ssl
-import time
 import traceback
 import os
 import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from backend.modules.logger import logger, log_security_event
-
-
-def create_ipv4_smtp_client(smtp_server, port, timeout=60):
-    """
-    Create a standard smtplib.SMTP or smtplib.SMTP_SSL instance connected via
-    an explicit IPv4 socket (socket.AF_INET) without subclassing smtplib or monkey-patching.
-    Reads initial 220 server greeting banner reliably.
-    """
-    t_dns_start = time.time()
-    dns_res = socket.getaddrinfo(smtp_server, port, socket.AF_INET, socket.SOCK_STREAM)
-    dns_duration = time.time() - t_dns_start
-    if not dns_res:
-        raise socket.gaierror(f"Could not resolve IPv4 address for {smtp_server}:{port}")
-
-    ipv4_ip = dns_res[0][4][0]
-    sa = (ipv4_ip, port)
-
-    print(f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {smtp_server}:{port} -> IPv4 {ipv4_ip} (Elapsed: {dns_duration:.3f}s)")
-    logger.info(f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {smtp_server}:{port} -> IPv4 {ipv4_ip} (Elapsed: {dns_duration:.3f}s)")
-
-    # TCP Connect
-    t_tcp_start = time.time()
-    raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    raw_sock.settimeout(timeout)
-    raw_sock.connect(sa)
-    tcp_duration = time.time() - t_tcp_start
-    print(f"[TIMING STAGE 2 - TCP CONNECT] Connected to {ipv4_ip}:{port} (Elapsed: {tcp_duration:.3f}s)")
-    logger.info(f"[TIMING STAGE 2 - TCP CONNECT] Connected to {ipv4_ip}:{port} (Elapsed: {tcp_duration:.3f}s)")
-
-    if port == 465:
-        # SSL Handshake for Port 465
-        t_ssl_start = time.time()
-        ctx = ssl.create_default_context()
-        ssl_sock = ctx.wrap_socket(raw_sock, server_hostname=smtp_server)
-        ssl_duration = time.time() - t_ssl_start
-        print(f"[TIMING STAGE 3 - SSL HANDSHAKE] Completed SSL handshake with {smtp_server} (Elapsed: {ssl_duration:.3f}s)")
-        logger.info(f"[TIMING STAGE 3 - SSL HANDSHAKE] Completed SSL handshake with {smtp_server} (Elapsed: {ssl_duration:.3f}s)")
-
-        # Instantiate standard smtplib.SMTP_SSL
-        t_banner_start = time.time()
-        server = smtplib.SMTP_SSL(timeout=timeout)
-        server._host = smtp_server
-        server._port = port
-        server.sock = ssl_sock
-        server.file = None
-
-        code, msg = server.getreply()
-        banner_duration = time.time() - t_banner_start
-        print(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code} {msg.decode() if isinstance(msg, bytes) else msg}' in {banner_duration:.3f}s")
-        logger.info(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code}' in {banner_duration:.3f}s")
-
-        if code != 220:
-            server.close()
-            raise smtplib.SMTPConnectError(code, msg)
-        return server
-    else:
-        # Port 587 STARTTLS
-        t_banner_start = time.time()
-        server = smtplib.SMTP(timeout=timeout)
-        server._host = smtp_server
-        server._port = port
-        server.sock = raw_sock
-        server.file = None
-
-        code, msg = server.getreply()
-        banner_duration = time.time() - t_banner_start
-        print(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code} {msg.decode() if isinstance(msg, bytes) else msg}' in {banner_duration:.3f}s")
-        logger.info(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code}' in {banner_duration:.3f}s")
-
-        if code != 220:
-            server.close()
-            raise smtplib.SMTPConnectError(code, msg)
-        return server
 
 
 def generate_otp(length=6):
@@ -171,7 +94,7 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
 
 def send_otp_email(recipient_email, otp_code, config):
     """
-    Send OTP code to recipient email address via HTTPS API or SMTP with full stage-by-stage timing.
+    Send OTP code to recipient email address using standard Python smtplib.
     Returns tuple: (success: bool, message: str)
     """
     recipient_email = (recipient_email or '').strip()
@@ -226,7 +149,7 @@ FaceGuard Security Team
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    # Multi-port Strategy (Testing with 60-second timeout)
+    # Standard smtplib multi-port dispatch strategy
     ports_to_try = [smtp_port, 465, 587]
     ports_to_try = list(dict.fromkeys(ports_to_try))
 
@@ -234,57 +157,28 @@ FaceGuard Security Team
 
     for p in ports_to_try:
         conn_method = "SMTP_SSL" if p == 465 else "STARTTLS"
-        print(f"\n========================================================")
-        print(f"[SMTP TIMING DIAGNOSTIC] Initiating test on {smtp_server}:{p} ({conn_method}) | Timeout=60s")
-        print(f"========================================================")
-
-        current_stage = "INIT"
-        stage_start = time.time()
-
         try:
-            current_stage = "CREATE_IPV4_CLIENT_AND_READ_BANNER"
-            stage_start = time.time()
-            server = create_ipv4_smtp_client(smtp_server, p, timeout=60)
+            print(f"[SMTP CONNECTING] Standard smtplib connecting to {smtp_server}:{p} ({conn_method})...")
+            logger.info(f"[SMTP CONNECTING] Standard smtplib connecting to {smtp_server}:{p} ({conn_method})")
 
-            if p != 465:
-                # Stage 5: STARTTLS Handshake
-                current_stage = "STARTTLS_HANDSHAKE"
-                stage_start = time.time()
-                print(f"[TIMING STAGE 5] Initiating STARTTLS handshake on {smtp_server}:{p}...")
+            if p == 465:
+                # Standard smtplib.SMTP_SSL
+                server = smtplib.SMTP_SSL(smtp_server, 465, timeout=30)
+            else:
+                # Standard smtplib.SMTP with STARTTLS
+                server = smtplib.SMTP(smtp_server, p, timeout=30)
+                print(f"[SMTP STARTTLS] Initiating STARTTLS handshake on {smtp_server}:{p}...")
+                logger.info(f"[SMTP STARTTLS] Initiating STARTTLS on {smtp_server}:{p}")
                 server.starttls()
-                stage_duration = time.time() - stage_start
-                starttls_log = f"[TIMING STAGE 5 SUCCESS] STARTTLS handshake completed in {stage_duration:.3f}s"
-                print(starttls_log)
-                logger.info(starttls_log)
 
-            # Stage 6: SMTP Authentication (server.login)
-            current_stage = "AUTHENTICATION_SERVER_LOGIN"
-            stage_start = time.time()
-            print(f"[TIMING STAGE 6] Authenticating user '{username}' via server.login()...")
+            print(f"[SMTP AUTHENTICATING] Authenticating user '{username}' on {smtp_server}:{p}...")
+            logger.info(f"[SMTP AUTHENTICATING] Authenticating {username} on port {p}")
             server.login(username, password)
-            stage_duration = time.time() - stage_start
-            auth_log = f"[TIMING STAGE 6 SUCCESS] Server login authenticated successfully in {stage_duration:.3f}s"
-            print(auth_log)
-            logger.info(auth_log)
 
-            # Stage 7: Sendmail (server.sendmail)
-            current_stage = "SENDMAIL"
-            stage_start = time.time()
-            print(f"[TIMING STAGE 7] Dispatching mail body from {mail_from} to {recipient_email}...")
+            print(f"[SMTP SENDING] Dispatching mail from {mail_from} to {recipient_email}...")
+            logger.info(f"[SMTP SENDING] Sending from {mail_from} to {recipient_email}")
             server.sendmail(mail_from, [recipient_email], msg.as_string())
-            stage_duration = time.time() - stage_start
-            send_log = f"[TIMING STAGE 7 SUCCESS] sendmail() completed in {stage_duration:.3f}s"
-            print(send_log)
-            logger.info(send_log)
-
-            # Stage 8: Connection Quit
-            current_stage = "QUIT"
-            stage_start = time.time()
             server.quit()
-            stage_duration = time.time() - stage_start
-            quit_log = f"[TIMING STAGE 8 SUCCESS] server.quit() completed in {stage_duration:.3f}s"
-            print(quit_log)
-            logger.info(quit_log)
 
             success_msg = f"OTP email delivered successfully to {recipient_email} via SMTP ({smtp_server}:{p})"
             print(f"[SMTP SUCCESS] {success_msg}")
@@ -293,45 +187,17 @@ FaceGuard Security Team
             return True, success_msg
 
         except smtplib.SMTPAuthenticationError as e:
-            stage_duration = time.time() - stage_start
-            full_tb = traceback.format_exc()
             err_text = e.smtp_error.decode() if isinstance(e.smtp_error, bytes) else str(e.smtp_error)
             last_error_details = f"SMTP Authentication Error ({e.smtp_code}): {err_text}"
-            diag_err = (
-                f"[TIMING STAGE FAILED: {current_stage}] Authentication failed after {stage_duration:.3f}s on {smtp_server}:{p}\n"
-                f"Full Traceback:\n{full_tb}"
-            )
-            print(diag_err)
-            logger.error(diag_err)
+            print(f"[SMTP FAILURE] Port {p} Auth Error: {last_error_details}")
+            logger.error(f"[SMTP FAILURE] Port {p} Auth Error: {last_error_details}")
             break
 
-        except (socket.timeout, TimeoutError) as e:
-            stage_duration = time.time() - stage_start
-            full_tb = traceback.format_exc()
-            last_error_details = f"TimeoutError at STAGE '{current_stage}' after {stage_duration:.3f}s: {e}"
-            diag_err = (
-                f"\n[TIMING TIMEOUT DETECTED]\n"
-                f"  - Failed Stage: {current_stage}\n"
-                f"  - Elapsed Time in Stage: {stage_duration:.3f}s\n"
-                f"  - Host:Port: {smtp_server}:{p} ({conn_method})\n"
-                f"Full Traceback:\n{full_tb}"
-            )
-            print(diag_err)
-            logger.error(diag_err)
-
         except Exception as e:
-            stage_duration = time.time() - stage_start
             full_tb = traceback.format_exc()
-            last_error_details = f"{type(e).__name__} at STAGE '{current_stage}' after {stage_duration:.3f}s: {e}"
-            diag_err = (
-                f"\n[TIMING FAILURE DETECTED]\n"
-                f"  - Failed Stage: {current_stage}\n"
-                f"  - Elapsed Time in Stage: {stage_duration:.3f}s\n"
-                f"  - Host:Port: {smtp_server}:{p} ({conn_method})\n"
-                f"Full Traceback:\n{full_tb}"
-            )
-            print(diag_err)
-            logger.error(diag_err)
+            last_error_details = f"{type(e).__name__}: {str(e)}"
+            print(f"[SMTP FAILURE] Port {p} ({conn_method}) failed on {smtp_server}:\n{full_tb}")
+            logger.error(f"[SMTP FAILURE] Port {p} ({conn_method}) failed on {smtp_server}:\n{full_tb}")
 
     final_err = f"SMTP delivery failed: {last_error_details}"
     print(f"[SMTP ERROR] {final_err}")
