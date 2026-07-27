@@ -1,13 +1,14 @@
 """
 OTP & Email Delivery Engine — Multi-protocol SMTP & HTTP API Mail Dispatcher.
-Uses dedicated IPv4-enforced SMTP transport subclasses (IPv4SMTP & IPv4SMTP_SSL) with
-stage-by-stage timing diagnostics, 60-second timeouts, and un-truncated failure tracebacks.
+Uses direct IPv4 socket creation (socket.AF_INET) attached to standard smtplib instances
+without subclassing or monkey-patching, providing robust 220 banner reading and stage timing.
 """
 
 import random
 import string
 import smtplib
 import socket
+import ssl
 import time
 import traceback
 import os
@@ -17,103 +18,77 @@ from email.mime.multipart import MIMEMultipart
 from backend.modules.logger import logger, log_security_event
 
 
-class IPv4SMTP(smtplib.SMTP):
+def create_ipv4_smtp_client(smtp_server, port, timeout=60):
     """
-    Subclass of smtplib.SMTP that forces IPv4 (socket.AF_INET) socket creation
-    with stage-by-stage timing logs and custom timeout handling.
+    Create a standard smtplib.SMTP or smtplib.SMTP_SSL instance connected via
+    an explicit IPv4 socket (socket.AF_INET) without subclassing smtplib or monkey-patching.
+    Reads initial 220 server greeting banner reliably.
     """
-    def _get_socket(self, host, port, timeout):
-        # Stage 1: DNS Resolution for IPv4
-        t_dns_start = time.time()
-        res = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-        dns_duration = time.time() - t_dns_start
-        if not res:
-            raise socket.gaierror(f"Could not resolve IPv4 address for {host}:{port}")
+    t_dns_start = time.time()
+    dns_res = socket.getaddrinfo(smtp_server, port, socket.AF_INET, socket.SOCK_STREAM)
+    dns_duration = time.time() - t_dns_start
+    if not dns_res:
+        raise socket.gaierror(f"Could not resolve IPv4 address for {smtp_server}:{port}")
 
-        af, socktype, proto, canonname, sa = res[0]
-        dns_log = f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {host}:{port} -> IPv4 {sa[0]} (Elapsed: {dns_duration:.3f}s)"
-        print(dns_log)
-        logger.info(dns_log)
+    ipv4_ip = dns_res[0][4][0]
+    sa = (ipv4_ip, port)
 
-        # Stage 2: TCP Socket Connect
-        t_tcp_start = time.time()
-        sock = socket.socket(af, socktype, proto)
-        if timeout is not None and timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
-            sock.settimeout(timeout)
-        if self.source_address:
-            sock.bind(self.source_address)
+    print(f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {smtp_server}:{port} -> IPv4 {ipv4_ip} (Elapsed: {dns_duration:.3f}s)")
+    logger.info(f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {smtp_server}:{port} -> IPv4 {ipv4_ip} (Elapsed: {dns_duration:.3f}s)")
 
-        try:
-            sock.connect(sa)
-            tcp_duration = time.time() - t_tcp_start
-            tcp_log = f"[TIMING STAGE 2 - TCP CONNECT] Established TCP connection to {sa[0]}:{sa[1]} (Elapsed: {tcp_duration:.3f}s)"
-            print(tcp_log)
-            logger.info(tcp_log)
-        except Exception as tcp_err:
-            tcp_duration = time.time() - t_tcp_start
-            err_log = f"[TIMING STAGE 2 FAILED - TCP CONNECT] Failed TCP connection to {sa[0]}:{sa[1]} after {tcp_duration:.3f}s: {tcp_err}"
-            print(err_log)
-            logger.error(err_log)
-            raise
+    # TCP Connect
+    t_tcp_start = time.time()
+    raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    raw_sock.settimeout(timeout)
+    raw_sock.connect(sa)
+    tcp_duration = time.time() - t_tcp_start
+    print(f"[TIMING STAGE 2 - TCP CONNECT] Connected to {ipv4_ip}:{port} (Elapsed: {tcp_duration:.3f}s)")
+    logger.info(f"[TIMING STAGE 2 - TCP CONNECT] Connected to {ipv4_ip}:{port} (Elapsed: {tcp_duration:.3f}s)")
 
-        return sock
-
-
-class IPv4SMTP_SSL(smtplib.SMTP_SSL):
-    """
-    Subclass of smtplib.SMTP_SSL that forces IPv4 (socket.AF_INET) socket creation
-    and measures SSL handshake timing cleanly.
-    """
-    def _get_socket(self, host, port, timeout):
-        # Stage 1: DNS Resolution for IPv4
-        t_dns_start = time.time()
-        res = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-        dns_duration = time.time() - t_dns_start
-        if not res:
-            raise socket.gaierror(f"Could not resolve IPv4 address for {host}:{port}")
-
-        af, socktype, proto, canonname, sa = res[0]
-        dns_log = f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {host}:{port} -> IPv4 {sa[0]} (Elapsed: {dns_duration:.3f}s)"
-        print(dns_log)
-        logger.info(dns_log)
-
-        # Stage 2: TCP Socket Connect
-        t_tcp_start = time.time()
-        sock = socket.socket(af, socktype, proto)
-        if timeout is not None and timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
-            sock.settimeout(timeout)
-        if self.source_address:
-            sock.bind(self.source_address)
-
-        try:
-            sock.connect(sa)
-            tcp_duration = time.time() - t_tcp_start
-            tcp_log = f"[TIMING STAGE 2 - TCP CONNECT] Established TCP connection to {sa[0]}:{sa[1]} (Elapsed: {tcp_duration:.3f}s)"
-            print(tcp_log)
-            logger.info(tcp_log)
-        except Exception as tcp_err:
-            tcp_duration = time.time() - t_tcp_start
-            err_log = f"[TIMING STAGE 2 FAILED - TCP CONNECT] Failed TCP connection to {sa[0]}:{sa[1]} after {tcp_duration:.3f}s: {tcp_err}"
-            print(err_log)
-            logger.error(err_log)
-            raise
-
-        # Stage 3: SSL Handshake
+    if port == 465:
+        # SSL Handshake for Port 465
         t_ssl_start = time.time()
-        server_hostname = self._host if self._host else host
-        try:
-            ssl_sock = self.context.wrap_socket(sock, server_hostname=server_hostname)
-            ssl_duration = time.time() - t_ssl_start
-            ssl_log = f"[TIMING STAGE 3 - SSL HANDSHAKE] Completed SSL handshake with {server_hostname} (Elapsed: {ssl_duration:.3f}s)"
-            print(ssl_log)
-            logger.info(ssl_log)
-            return ssl_sock
-        except Exception as ssl_err:
-            ssl_duration = time.time() - t_ssl_start
-            err_log = f"[TIMING STAGE 3 FAILED - SSL HANDSHAKE] Failed SSL handshake with {server_hostname} after {ssl_duration:.3f}s: {ssl_err}"
-            print(err_log)
-            logger.error(err_log)
-            raise
+        ctx = ssl.create_default_context()
+        ssl_sock = ctx.wrap_socket(raw_sock, server_hostname=smtp_server)
+        ssl_duration = time.time() - t_ssl_start
+        print(f"[TIMING STAGE 3 - SSL HANDSHAKE] Completed SSL handshake with {smtp_server} (Elapsed: {ssl_duration:.3f}s)")
+        logger.info(f"[TIMING STAGE 3 - SSL HANDSHAKE] Completed SSL handshake with {smtp_server} (Elapsed: {ssl_duration:.3f}s)")
+
+        # Instantiate standard smtplib.SMTP_SSL
+        t_banner_start = time.time()
+        server = smtplib.SMTP_SSL(timeout=timeout)
+        server._host = smtp_server
+        server._port = port
+        server.sock = ssl_sock
+        server.file = None
+
+        code, msg = server.getreply()
+        banner_duration = time.time() - t_banner_start
+        print(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code} {msg.decode() if isinstance(msg, bytes) else msg}' in {banner_duration:.3f}s")
+        logger.info(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code}' in {banner_duration:.3f}s")
+
+        if code != 220:
+            server.close()
+            raise smtplib.SMTPConnectError(code, msg)
+        return server
+    else:
+        # Port 587 STARTTLS
+        t_banner_start = time.time()
+        server = smtplib.SMTP(timeout=timeout)
+        server._host = smtp_server
+        server._port = port
+        server.sock = raw_sock
+        server.file = None
+
+        code, msg = server.getreply()
+        banner_duration = time.time() - t_banner_start
+        print(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code} {msg.decode() if isinstance(msg, bytes) else msg}' in {banner_duration:.3f}s")
+        logger.info(f"[TIMING STAGE 4 - BANNER 220 GREETING] Received banner '{code}' in {banner_duration:.3f}s")
+
+        if code != 220:
+            server.close()
+            raise smtplib.SMTPConnectError(code, msg)
+        return server
 
 
 def generate_otp(length=6):
@@ -267,22 +242,9 @@ FaceGuard Security Team
         stage_start = time.time()
 
         try:
-            # Stage 4: SMTP Transport Instantiation & Greeting Banner
-            current_stage = "SMTP_INIT_AND_BANNER"
+            current_stage = "CREATE_IPV4_CLIENT_AND_READ_BANNER"
             stage_start = time.time()
-            print(f"[TIMING STAGE 4] Initializing {conn_method} transport to {smtp_server}:{p} (Timeout=60s)...")
-
-            if p == 465:
-                # SSL Connection for Port 465 with 60s timeout
-                server = IPv4SMTP_SSL(smtp_server, 465, timeout=60)
-            else:
-                # Standard Connection for Port 587 with 60s timeout
-                server = IPv4SMTP(smtp_server, p, timeout=60)
-
-            stage_duration = time.time() - stage_start
-            init_log = f"[TIMING STAGE 4 SUCCESS] SMTP Transport Init & EHLO Banner greeting completed in {stage_duration:.3f}s"
-            print(init_log)
-            logger.info(init_log)
+            server = create_ipv4_smtp_client(smtp_server, p, timeout=60)
 
             if p != 465:
                 # Stage 5: STARTTLS Handshake
