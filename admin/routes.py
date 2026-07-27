@@ -3,10 +3,10 @@ Admin Routes — Admin login, dashboard, user management, and log viewing.
 """
 
 import time
+import os
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
 from backend.modules.otp_service import generate_otp, send_otp_email
 
-import os
 admin_template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin', template_folder=admin_template_dir)
 
@@ -66,7 +66,6 @@ def admin_login():
                 'created_at': time.time()
             }
 
-            # Refresh latest persistent system settings into config
             try:
                 saved_settings = db.get_all_settings()
                 for key, val in saved_settings.items():
@@ -80,12 +79,14 @@ def admin_login():
             except Exception:
                 pass
 
-            success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
-            if is_fallback:
-                flash(f"Admin Security Verification Code: {otp_code}", "warning")
-            else:
+            success, msg = send_otp_email(admin_email, otp_code, current_app.config)
+            if success:
                 flash(f"Credentials verified. OTP sent to {mask_email(admin_email)}.", "info")
-            return render_template('admin/login.html', step='otp', masked_email=mask_email(admin_email))
+                return render_template('admin/login.html', step='otp', masked_email=mask_email(admin_email))
+            else:
+                session.pop('pending_admin_otp', None)
+                flash(f"Failed to send OTP email: {msg}", "error")
+                return render_template('admin/login.html')
         else:
             flash('Invalid credentials.', 'error')
 
@@ -111,7 +112,6 @@ def verify_credentials():
     admin_email = admin.get('email') or current_app.config.get('DEFAULT_ADMIN_EMAIL') or ''
     otp_code = generate_otp(6)
 
-    # Store pending OTP in session
     session['pending_admin_otp'] = {
         'otp': otp_code,
         'username': admin['username'],
@@ -119,7 +119,6 @@ def verify_credentials():
         'created_at': time.time()
     }
 
-    # Refresh latest persistent system settings into config
     try:
         saved_settings = db.get_all_settings()
         for key, val in saved_settings.items():
@@ -133,21 +132,21 @@ def verify_credentials():
     except Exception:
         pass
 
-    # Dispatch OTP email
-    success, is_fallback, msg = send_otp_email(admin_email, otp_code, current_app.config)
+    success, msg = send_otp_email(admin_email, otp_code, current_app.config)
 
-    if not is_fallback:
-        display_message = f"OTP sent to {mask_email(admin_email)}"
+    if success:
+        return jsonify({
+            'success': True,
+            'message': f"OTP sent to {mask_email(admin_email)}",
+            'masked_email': mask_email(admin_email),
+            'status_msg': msg
+        })
     else:
-        display_message = f"Admin Security Verification Code: {otp_code}"
-
-    return jsonify({
-        'success': True,
-        'message': display_message,
-        'masked_email': mask_email(admin_email),
-        'is_fallback': is_fallback,
-        'status_msg': msg
-    })
+        session.pop('pending_admin_otp', None)
+        return jsonify({
+            'success': False,
+            'message': f"Failed to send OTP email: {msg}"
+        }), 500
 
 
 @admin_bp.route('/verify-otp', methods=['POST'])
@@ -168,7 +167,6 @@ def verify_otp():
     if submitted_otp != pending.get('otp'):
         return jsonify({'success': False, 'message': 'Invalid OTP code. Please try again.'}), 400
 
-    # OTP Verified Successfully -> Authenticate Admin Session
     session['admin_logged_in'] = True
     session['admin_username'] = pending.get('username')
     session.pop('pending_admin_otp', None)
@@ -178,7 +176,6 @@ def verify_otp():
         'message': 'OTP verified successfully!',
         'redirect_url': url_for('admin.admin_dashboard')
     })
-
 
 
 @admin_bp.route('/dashboard')
@@ -219,8 +216,6 @@ def delete_user(user_id):
     user = db.get_user_by_id(user_id)
 
     if user:
-        # Delete face image file
-        import os
         if user.get('face_image_path') and os.path.exists(user['face_image_path']):
             try:
                 os.remove(user['face_image_path'])
@@ -251,7 +246,6 @@ def admin_logs():
     """View login logs."""
     db = get_db()
 
-    # Get filter parameters
     status_filter = request.args.get('status', None)
     user_filter = request.args.get('user_id', None)
     limit = request.args.get('limit', 50, type=int)
@@ -291,7 +285,6 @@ def admin_settings():
     admin_info = db.get_admin_by_username(current_username)
 
     if not admin_info:
-        # Fallback if session admin username not found
         admin_info = {
             'admin_id': 1,
             'username': current_username,
@@ -365,7 +358,6 @@ def update_smtp():
     smtp_use_tls = 'smtp_use_tls' in request.form
     mail_from = request.form.get('mail_from_address', '').strip()
 
-    # Save to database system_settings
     db.update_setting('SMTP_SERVER', smtp_server)
     db.update_setting('SMTP_PORT', smtp_port)
     db.update_setting('SMTP_USERNAME', smtp_username)
@@ -375,7 +367,6 @@ def update_smtp():
     db.update_setting('SMTP_USE_TLS', 'true' if smtp_use_tls else 'false')
     db.update_setting('MAIL_FROM_ADDRESS', mail_from)
 
-    # Update current app config live
     current_app.config['SMTP_SERVER'] = smtp_server
     current_app.config['SMTP_PORT'] = int(smtp_port) if smtp_port.isdigit() else 587
     current_app.config['SMTP_USERNAME'] = smtp_username
@@ -401,12 +392,12 @@ def test_email_dispatch():
     from backend.modules.otp_service import generate_otp, send_otp_email
 
     test_otp = generate_otp(6)
-    success, is_fallback, msg = send_otp_email(target_email, test_otp, current_app.config)
+    success, msg = send_otp_email(target_email, test_otp, current_app.config)
 
-    if not is_fallback:
+    if success:
         return jsonify({'success': True, 'message': f'Test OTP dispatched successfully to {target_email}!'})
     else:
-        return jsonify({'success': True, 'message': f'Security test OTP generated for {target_email}: {test_otp}'})
+        return jsonify({'success': False, 'message': f'SMTP test failed: {msg}'}), 500
 
 
 @admin_bp.route('/settings/change-password', methods=['POST'])
@@ -425,7 +416,6 @@ def change_password():
     new_password = request.form.get('new_password', '')
     confirm_password = request.form.get('confirm_password', '')
 
-    # Verify current password
     from werkzeug.security import check_password_hash
     if not check_password_hash(admin_info['password_hash'], current_password):
         flash('Current password is incorrect.', 'error')
@@ -440,7 +430,6 @@ def change_password():
         return redirect(url_for('admin.admin_settings'))
 
     success, message = db.update_admin_password(admin_info['admin_id'], new_password)
-
     if success:
         flash(message, 'success')
     else:
