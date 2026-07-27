@@ -1,14 +1,14 @@
 """
 OTP & Email Delivery Engine — Multi-protocol SMTP & HTTP API Mail Dispatcher.
-Uses dedicated IPv4-enforced SMTP transport subclasses (IPv4SMTP & IPv4SMTP_SSL)
-to prevent container IPv6 network unreachable errors on cloud platforms like Render/AWS/GCP
-without globally monkey-patching socket functions.
+Uses dedicated IPv4-enforced SMTP transport subclasses (IPv4SMTP & IPv4SMTP_SSL) with
+stage-by-stage timing diagnostics, 60-second timeouts, and un-truncated failure tracebacks.
 """
 
 import random
 import string
 import smtplib
 import socket
+import time
 import traceback
 import os
 import requests
@@ -20,47 +20,100 @@ from backend.modules.logger import logger, log_security_event
 class IPv4SMTP(smtplib.SMTP):
     """
     Subclass of smtplib.SMTP that forces IPv4 (socket.AF_INET) socket creation
-    without modifying global socket behavior. This resolves container IPv6 unreachable
-    errors on cloud platforms like Render/AWS/GCP where container interfaces lack IPv6 gateways.
+    with stage-by-stage timing logs and custom timeout handling.
     """
     def _get_socket(self, host, port, timeout):
-        # Resolve IPv4 addresses specifically for this SMTP connection
+        # Stage 1: DNS Resolution for IPv4
+        t_dns_start = time.time()
         res = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        dns_duration = time.time() - t_dns_start
         if not res:
             raise socket.gaierror(f"Could not resolve IPv4 address for {host}:{port}")
 
         af, socktype, proto, canonname, sa = res[0]
+        dns_log = f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {host}:{port} -> IPv4 {sa[0]} (Elapsed: {dns_duration:.3f}s)"
+        print(dns_log)
+        logger.info(dns_log)
+
+        # Stage 2: TCP Socket Connect
+        t_tcp_start = time.time()
         sock = socket.socket(af, socktype, proto)
         if timeout is not None and timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
             sock.settimeout(timeout)
         if self.source_address:
             sock.bind(self.source_address)
-        sock.connect(sa)
+
+        try:
+            sock.connect(sa)
+            tcp_duration = time.time() - t_tcp_start
+            tcp_log = f"[TIMING STAGE 2 - TCP CONNECT] Established TCP connection to {sa[0]}:{sa[1]} (Elapsed: {tcp_duration:.3f}s)"
+            print(tcp_log)
+            logger.info(tcp_log)
+        except Exception as tcp_err:
+            tcp_duration = time.time() - t_tcp_start
+            err_log = f"[TIMING STAGE 2 FAILED - TCP CONNECT] Failed TCP connection to {sa[0]}:{sa[1]} after {tcp_duration:.3f}s: {tcp_err}"
+            print(err_log)
+            logger.error(err_log)
+            raise
+
         return sock
 
 
 class IPv4SMTP_SSL(smtplib.SMTP_SSL):
     """
     Subclass of smtplib.SMTP_SSL that forces IPv4 (socket.AF_INET) socket creation
-    without modifying global socket behavior, while preserving SNI TLS certificate verification.
+    and measures SSL handshake timing cleanly.
     """
     def _get_socket(self, host, port, timeout):
-        # Resolve IPv4 addresses specifically for this SMTP_SSL connection
+        # Stage 1: DNS Resolution for IPv4
+        t_dns_start = time.time()
         res = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        dns_duration = time.time() - t_dns_start
         if not res:
             raise socket.gaierror(f"Could not resolve IPv4 address for {host}:{port}")
 
         af, socktype, proto, canonname, sa = res[0]
+        dns_log = f"[TIMING STAGE 1 - DNS RESOLUTION] Host: {host}:{port} -> IPv4 {sa[0]} (Elapsed: {dns_duration:.3f}s)"
+        print(dns_log)
+        logger.info(dns_log)
+
+        # Stage 2: TCP Socket Connect
+        t_tcp_start = time.time()
         sock = socket.socket(af, socktype, proto)
         if timeout is not None and timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
             sock.settimeout(timeout)
         if self.source_address:
             sock.bind(self.source_address)
-        sock.connect(sa)
 
-        # Wrap socket with SSL context, maintaining SNI server_hostname verification
+        try:
+            sock.connect(sa)
+            tcp_duration = time.time() - t_tcp_start
+            tcp_log = f"[TIMING STAGE 2 - TCP CONNECT] Established TCP connection to {sa[0]}:{sa[1]} (Elapsed: {tcp_duration:.3f}s)"
+            print(tcp_log)
+            logger.info(tcp_log)
+        except Exception as tcp_err:
+            tcp_duration = time.time() - t_tcp_start
+            err_log = f"[TIMING STAGE 2 FAILED - TCP CONNECT] Failed TCP connection to {sa[0]}:{sa[1]} after {tcp_duration:.3f}s: {tcp_err}"
+            print(err_log)
+            logger.error(err_log)
+            raise
+
+        # Stage 3: SSL Handshake
+        t_ssl_start = time.time()
         server_hostname = self._host if self._host else host
-        return self.context.wrap_socket(sock, server_hostname=server_hostname)
+        try:
+            ssl_sock = self.context.wrap_socket(sock, server_hostname=server_hostname)
+            ssl_duration = time.time() - t_ssl_start
+            ssl_log = f"[TIMING STAGE 3 - SSL HANDSHAKE] Completed SSL handshake with {server_hostname} (Elapsed: {ssl_duration:.3f}s)"
+            print(ssl_log)
+            logger.info(ssl_log)
+            return ssl_sock
+        except Exception as ssl_err:
+            ssl_duration = time.time() - t_ssl_start
+            err_log = f"[TIMING STAGE 3 FAILED - SSL HANDSHAKE] Failed SSL handshake with {server_hostname} after {ssl_duration:.3f}s: {ssl_err}"
+            print(err_log)
+            logger.error(err_log)
+            raise
 
 
 def generate_otp(length=6):
@@ -143,7 +196,7 @@ def send_via_http_api(recipient_email, otp_code, subject, body, config):
 
 def send_otp_email(recipient_email, otp_code, config):
     """
-    Send OTP code to recipient email address via HTTPS API or SMTP.
+    Send OTP code to recipient email address via HTTPS API or SMTP with full stage-by-stage timing.
     Returns tuple: (success: bool, message: str)
     """
     recipient_email = (recipient_email or '').strip()
@@ -198,8 +251,7 @@ FaceGuard Security Team
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    # Single or Multi-port Connection Strategy
-    # Port 465 MUST use SSL (IPv4SMTP_SSL). Port 587 MUST use STARTTLS (IPv4SMTP).
+    # Multi-port Strategy (Testing with 60-second timeout)
     ports_to_try = [smtp_port, 465, 587]
     ports_to_try = list(dict.fromkeys(ports_to_try))
 
@@ -207,51 +259,70 @@ FaceGuard Security Team
 
     for p in ports_to_try:
         conn_method = "SMTP_SSL" if p == 465 else "STARTTLS"
+        print(f"\n========================================================")
+        print(f"[SMTP TIMING DIAGNOSTIC] Initiating test on {smtp_server}:{p} ({conn_method}) | Timeout=60s")
+        print(f"========================================================")
 
-        # DNS Resolution Diagnostic for IPv4
-        ipv4_addrs = []
-        try:
-            dns_info = socket.getaddrinfo(smtp_server, p, socket.AF_INET, socket.SOCK_STREAM)
-            for res in dns_info:
-                ip = res[4][0]
-                if ip not in ipv4_addrs:
-                    ipv4_addrs.append(ip)
-        except Exception as dns_e:
-            logger.warning(f"[SMTP DNS DIAGNOSTIC WARNING] Resolution failed for {smtp_server}:{p} — {dns_e}")
-
-        diag_header = (
-            f"[SMTP DIAGNOSTIC]\n"
-            f"  - Server: {smtp_server}\n"
-            f"  - Port: {p}\n"
-            f"  - Connection Method: {conn_method}\n"
-            f"  - Enforced Transport: IPv4 Subclass (AF_INET)\n"
-            f"  - Resolved IPv4 Addresses: {ipv4_addrs if ipv4_addrs else 'None'}"
-        )
-        print(diag_header)
-        logger.info(diag_header)
+        current_stage = "INIT"
+        stage_start = time.time()
 
         try:
-            print(f"[SMTP CONNECTING] Connecting to {smtp_server}:{p} ({conn_method}) via IPv4 transport...")
-            logger.info(f"[SMTP CONNECTING] Connecting to {smtp_server}:{p} ({conn_method}) via IPv4 transport")
+            # Stage 4: SMTP Transport Instantiation & Greeting Banner
+            current_stage = "SMTP_INIT_AND_BANNER"
+            stage_start = time.time()
+            print(f"[TIMING STAGE 4] Initializing {conn_method} transport to {smtp_server}:{p} (Timeout=60s)...")
 
             if p == 465:
-                # SSL Connection for Port 465 using IPv4-enforced SMTP_SSL transport subclass
-                server = IPv4SMTP_SSL(smtp_server, 465, timeout=15)
+                # SSL Connection for Port 465 with 60s timeout
+                server = IPv4SMTP_SSL(smtp_server, 465, timeout=60)
             else:
-                # Standard Connection for Port 587 using IPv4-enforced SMTP transport subclass + STARTTLS
-                server = IPv4SMTP(smtp_server, p, timeout=15)
-                print(f"[SMTP STARTTLS] Initiating STARTTLS handshake on {smtp_server}:{p}...")
-                logger.info(f"[SMTP STARTTLS] Initiating STARTTLS on {smtp_server}:{p}")
+                # Standard Connection for Port 587 with 60s timeout
+                server = IPv4SMTP(smtp_server, p, timeout=60)
+
+            stage_duration = time.time() - stage_start
+            init_log = f"[TIMING STAGE 4 SUCCESS] SMTP Transport Init & EHLO Banner greeting completed in {stage_duration:.3f}s"
+            print(init_log)
+            logger.info(init_log)
+
+            if p != 465:
+                # Stage 5: STARTTLS Handshake
+                current_stage = "STARTTLS_HANDSHAKE"
+                stage_start = time.time()
+                print(f"[TIMING STAGE 5] Initiating STARTTLS handshake on {smtp_server}:{p}...")
                 server.starttls()
+                stage_duration = time.time() - stage_start
+                starttls_log = f"[TIMING STAGE 5 SUCCESS] STARTTLS handshake completed in {stage_duration:.3f}s"
+                print(starttls_log)
+                logger.info(starttls_log)
 
-            print(f"[SMTP AUTHENTICATING] Authenticating user '{username}' on {smtp_server}:{p}...")
-            logger.info(f"[SMTP AUTHENTICATING] Authenticating {username} on port {p}")
+            # Stage 6: SMTP Authentication (server.login)
+            current_stage = "AUTHENTICATION_SERVER_LOGIN"
+            stage_start = time.time()
+            print(f"[TIMING STAGE 6] Authenticating user '{username}' via server.login()...")
             server.login(username, password)
+            stage_duration = time.time() - stage_start
+            auth_log = f"[TIMING STAGE 6 SUCCESS] Server login authenticated successfully in {stage_duration:.3f}s"
+            print(auth_log)
+            logger.info(auth_log)
 
-            print(f"[SMTP SENDING] Dispatching mail from {mail_from} to {recipient_email}...")
-            logger.info(f"[SMTP SENDING] Sending from {mail_from} to {recipient_email}")
+            # Stage 7: Sendmail (server.sendmail)
+            current_stage = "SENDMAIL"
+            stage_start = time.time()
+            print(f"[TIMING STAGE 7] Dispatching mail body from {mail_from} to {recipient_email}...")
             server.sendmail(mail_from, [recipient_email], msg.as_string())
+            stage_duration = time.time() - stage_start
+            send_log = f"[TIMING STAGE 7 SUCCESS] sendmail() completed in {stage_duration:.3f}s"
+            print(send_log)
+            logger.info(send_log)
+
+            # Stage 8: Connection Quit
+            current_stage = "QUIT"
+            stage_start = time.time()
             server.quit()
+            stage_duration = time.time() - stage_start
+            quit_log = f"[TIMING STAGE 8 SUCCESS] server.quit() completed in {stage_duration:.3f}s"
+            print(quit_log)
+            logger.info(quit_log)
 
             success_msg = f"OTP email delivered successfully to {recipient_email} via SMTP ({smtp_server}:{p})"
             print(f"[SMTP SUCCESS] {success_msg}")
@@ -260,22 +331,41 @@ FaceGuard Security Team
             return True, success_msg
 
         except smtplib.SMTPAuthenticationError as e:
+            stage_duration = time.time() - stage_start
             full_tb = traceback.format_exc()
             err_text = e.smtp_error.decode() if isinstance(e.smtp_error, bytes) else str(e.smtp_error)
             last_error_details = f"SMTP Authentication Error ({e.smtp_code}): {err_text}"
             diag_err = (
-                f"[SMTP FAILURE DIAGNOSTIC] Authentication failed on {smtp_server}:{p}\n"
+                f"[TIMING STAGE FAILED: {current_stage}] Authentication failed after {stage_duration:.3f}s on {smtp_server}:{p}\n"
                 f"Full Traceback:\n{full_tb}"
             )
             print(diag_err)
             logger.error(diag_err)
             break
 
-        except Exception as e:
+        except (socket.timeout, TimeoutError) as e:
+            stage_duration = time.time() - stage_start
             full_tb = traceback.format_exc()
-            last_error_details = f"{type(e).__name__}: {str(e)}"
+            last_error_details = f"TimeoutError at STAGE '{current_stage}' after {stage_duration:.3f}s: {e}"
             diag_err = (
-                f"[SMTP FAILURE DIAGNOSTIC] Port {p} ({conn_method}) failed on {smtp_server}:\n"
+                f"\n[TIMING TIMEOUT DETECTED]\n"
+                f"  - Failed Stage: {current_stage}\n"
+                f"  - Elapsed Time in Stage: {stage_duration:.3f}s\n"
+                f"  - Host:Port: {smtp_server}:{p} ({conn_method})\n"
+                f"Full Traceback:\n{full_tb}"
+            )
+            print(diag_err)
+            logger.error(diag_err)
+
+        except Exception as e:
+            stage_duration = time.time() - stage_start
+            full_tb = traceback.format_exc()
+            last_error_details = f"{type(e).__name__} at STAGE '{current_stage}' after {stage_duration:.3f}s: {e}"
+            diag_err = (
+                f"\n[TIMING FAILURE DETECTED]\n"
+                f"  - Failed Stage: {current_stage}\n"
+                f"  - Elapsed Time in Stage: {stage_duration:.3f}s\n"
+                f"  - Host:Port: {smtp_server}:{p} ({conn_method})\n"
                 f"Full Traceback:\n{full_tb}"
             )
             print(diag_err)
