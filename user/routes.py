@@ -1,5 +1,5 @@
 """
-Authentication Routes — Registration, Login, Dashboard, Logout.
+Authentication Routes — Registration, Login, User Dashboard, Profile Management, Logout.
 """
 
 import os
@@ -9,6 +9,7 @@ from flask import Blueprint, render_template, request, jsonify, session, redirec
 from backend.modules.face_detection import detect_face, decode_base64_image
 from backend.modules.face_recognition_mod import encode_face, match_face
 from backend.modules.gesture_detection import detect_gesture, get_random_gesture, get_gesture_display_name, get_gesture_instruction
+from backend.modules.security import sanitize_input, validate_password_strength
 
 user_template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 auth_bp = Blueprint('auth', __name__, template_folder=user_template_dir)
@@ -18,6 +19,18 @@ def get_db():
     """Get database instance from app config."""
     from flask import current_app
     return current_app.config['DB_INSTANCE']
+
+
+def get_device_type(user_agent_str):
+    """Simple parser for user agent device type."""
+    if not user_agent_str:
+        return "Desktop"
+    ua = user_agent_str.lower()
+    if "mobile" in ua or "android" in ua or "iphone" in ua:
+        return "Mobile"
+    if "tablet" in ua or "ipad" in ua:
+        return "Tablet"
+    return "Desktop"
 
 
 @auth_bp.route('/')
@@ -34,52 +47,49 @@ def register():
 
 @auth_bp.route('/api/register', methods=['POST'])
 def api_register():
-    """
-    Process user registration.
-    Expects JSON: {name, email, image (base64)}
-    """
+    """Process user registration."""
     data = request.get_json()
-
     if not data:
         return jsonify({'success': False, 'message': 'No data provided'}), 400
 
-    name = data.get('name', '').strip()
-    email = data.get('email', '').strip()
+    name = sanitize_input(data.get('name', ''))
+    email = sanitize_input(data.get('email', '')).lower()
     image_data = data.get('image', '')
+    password = data.get('password', '')
 
-    # Validate inputs
     if not name:
         return jsonify({'success': False, 'message': 'Name is required'}), 400
-    if not email:
-        return jsonify({'success': False, 'message': 'Email is required'}), 400
+    if not email or '@' not in email:
+        return jsonify({'success': False, 'message': 'Valid email is required'}), 400
     if not image_data:
         return jsonify({'success': False, 'message': 'Face image is required'}), 400
 
-    # Check if email already exists
+    # Password policy check if password provided
+    if password:
+        is_strong, errors, _ = validate_password_strength(password)
+        if not is_strong:
+            return jsonify({'success': False, 'message': errors[0]}), 400
+
     db = get_db()
     if db.get_user_by_email(email):
         return jsonify({'success': False, 'message': 'Email already registered'}), 400
 
-    # Decode the base64 image
     try:
         frame = decode_base64_image(image_data)
-    except Exception as e:
+    except Exception:
         frame = None
 
     if frame is None:
         return jsonify({'success': False, 'message': 'Unable to decode webcam image. Please check camera input.'}), 400
 
-    # Detect face
     success, face_locations, message = detect_face(frame)
     if not success:
         return jsonify({'success': False, 'message': message}), 400
 
-    # Generate face encoding
     enc_success, encoding, enc_message = encode_face(frame)
     if not enc_success:
         return jsonify({'success': False, 'message': enc_message}), 400
 
-    # Save face image
     from flask import current_app
     face_dir = current_app.config.get('FACE_ENCODING_DIR', 'data/face_encodings')
     try:
@@ -90,7 +100,6 @@ def api_register():
     image_filename = f"{uuid.uuid4().hex}.jpg"
     image_path = os.path.join(face_dir, image_filename)
 
-    # Save cropped face image safely
     try:
         x, y, w_box, h_box = map(int, face_locations[0][:4])
         margin = 40
@@ -107,8 +116,7 @@ def api_register():
     except Exception as e:
         print(f"Warning: Failed to save face crop file: {e}")
 
-    # Add user to database
-    user_id = db.add_user(name, email, encoding, image_path)
+    user_id = db.add_user(name, email, encoding, image_path, password=password)
     if user_id is None:
         return jsonify({'success': False, 'message': 'Failed to register. Email may already exist.'}), 400
 
@@ -127,35 +135,27 @@ def login():
 
 @auth_bp.route('/api/login/detect', methods=['POST'])
 def api_login_detect():
-    """
-    Step 1 of login: Detect and match face.
-    Expects JSON: {image (base64)}
-    Returns: matched user info + gesture challenge
-    """
+    """Step 1 of login: Detect & match face."""
     data = request.get_json()
     if not data or not data.get('image'):
         return jsonify({'success': False, 'message': 'No image provided'}), 400
 
-    # Decode image
     try:
         frame = decode_base64_image(data['image'])
     except Exception:
         frame = None
 
     if frame is None:
-        return jsonify({'success': False, 'message': 'Unable to process camera image. Please check your webcam input.'}), 400
+        return jsonify({'success': False, 'message': 'Unable to process camera image. Please check webcam input.'}), 400
 
-    # Detect face
     success, face_locations, message = detect_face(frame)
     if not success:
         return jsonify({'success': False, 'message': message}), 400
 
-    # Encode detected face
     enc_success, encoding, enc_message = encode_face(frame)
     if not enc_success:
         return jsonify({'success': False, 'message': enc_message}), 400
 
-    # Match against stored encodings
     db = get_db()
     stored_encodings = db.get_all_face_encodings()
 
@@ -163,21 +163,27 @@ def api_login_detect():
     tolerance = current_app.config.get('FACE_RECOGNITION_TOLERANCE', 0.6)
     matched, user_id, confidence, match_message = match_face(encoding, stored_encodings, tolerance)
 
+    ua_str = request.headers.get('User-Agent', '')
+    dev_type = get_device_type(ua_str)
+
     if not matched:
-        # Log failed attempt
-        db.log_login_attempt(None, 'Failed', None, None, request.remote_addr)
+        db.log_login_attempt(None, 'Failed', None, None, request.remote_addr, user_agent=ua_str, device_type=dev_type)
         return jsonify({'success': False, 'message': match_message}), 401
 
-    # Face matched — generate gesture challenge
+    user = db.get_user_by_id(user_id)
+    if not user or not user.get('is_active', 1):
+        db.log_login_attempt(user_id, 'Failed', None, None, request.remote_addr, user_agent=ua_str, device_type=dev_type)
+        return jsonify({'success': False, 'message': 'Account is inactive or disabled.'}), 401
+
+    # Check account lockout
+    locked, remaining_mins = db.is_account_locked(user['email'])
+    if locked:
+        return jsonify({'success': False, 'message': f'Account locked due to failed attempts. Please try again in {remaining_mins} minutes.'}), 403
+
     gesture = get_random_gesture()
     session['login_user_id'] = user_id
     session['login_gesture'] = gesture
     session['login_confidence'] = confidence
-
-    user = db.get_user_by_id(user_id)
-    if not user or not user.get('is_active', 1):
-        db.log_login_attempt(user_id, 'Failed', None, None, request.remote_addr)
-        return jsonify({'success': False, 'message': 'Account is inactive or does not exist.'}), 401
 
     return jsonify({
         'success': True,
@@ -192,49 +198,43 @@ def api_login_detect():
 
 @auth_bp.route('/api/login/gesture', methods=['POST'])
 def api_login_gesture():
-    """
-    Step 2 of login: Verify gesture challenge.
-    Expects JSON: {image (base64)}
-    """
-    # Check session
+    """Step 2 of login: Verify gesture challenge."""
     user_id = session.get('login_user_id')
     target_gesture = session.get('login_gesture')
 
     if not user_id or not target_gesture:
-        return jsonify({'success': False, 'message': 'Session expired. Please start login again.'}), 400
+        return jsonify({'success': False, 'message': 'Session expired. Please restart login.'}), 400
 
     data = request.get_json()
     if not data or not data.get('image'):
         return jsonify({'success': False, 'message': 'No image provided'}), 400
 
-    # Decode image
     try:
         frame = decode_base64_image(data['image'])
     except Exception:
         frame = None
 
     if frame is None:
-        return jsonify({'success': False, 'message': 'Unable to process camera image. Please check your webcam input.'}), 400
+        return jsonify({'success': False, 'message': 'Unable to process camera image.'}), 400
 
-    # Detect gesture
     detected, confidence, message = detect_gesture(frame, target_gesture)
-
     db = get_db()
+    ua_str = request.headers.get('User-Agent', '')
+    dev_type = get_device_type(ua_str)
+
+    user = db.get_user_by_id(user_id)
 
     if detected:
-        # Gesture verified — grant access
         session['user_id'] = user_id
         session['logged_in'] = True
 
-        # Clear login session data
         session.pop('login_user_id', None)
         session.pop('login_gesture', None)
         session.pop('login_confidence', None)
 
-        # Log successful login
-        db.log_login_attempt(user_id, 'Success', target_gesture, 'Verified', request.remote_addr)
+        db.reset_failed_attempts(user_id)
+        db.log_login_attempt(user_id, 'Success', target_gesture, 'Verified', request.remote_addr, user_agent=ua_str, device_type=dev_type)
 
-        user = db.get_user_by_id(user_id)
         user_name = user['name'] if user else 'User'
 
         return jsonify({
@@ -243,8 +243,9 @@ def api_login_gesture():
             'redirect': url_for('auth.dashboard')
         })
     else:
-        # Gesture failed
-        db.log_login_attempt(user_id, 'Failed', target_gesture, 'Failed', request.remote_addr)
+        if user:
+            db.increment_failed_attempts(user['email'])
+        db.log_login_attempt(user_id, 'Failed', target_gesture, 'Failed', request.remote_addr, user_agent=ua_str, device_type=dev_type)
 
         return jsonify({
             'success': False,
@@ -256,7 +257,7 @@ def api_login_gesture():
 
 @auth_bp.route('/dashboard')
 def dashboard():
-    """Authenticated user dashboard."""
+    """User dashboard."""
     if not session.get('logged_in'):
         flash('Please log in first.', 'warning')
         return redirect(url_for('auth.login'))
@@ -268,15 +269,13 @@ def dashboard():
         session.clear()
         return redirect(url_for('auth.login'))
 
-    # Get user's recent login logs
     logs = db.get_login_logs(limit=10, user_id=user['user_id'])
-
     return render_template('dashboard.html', user=user, logs=logs)
 
 
 @auth_bp.route('/logout')
 def logout():
-    """Clear session and log out."""
+    """Log out."""
     next_dest = request.args.get('next', 'index')
     session.clear()
     flash('You have been logged out.', 'info')
@@ -285,4 +284,3 @@ def logout():
     elif next_dest == 'user':
         return redirect(url_for('auth.login'))
     return redirect(url_for('auth.index'))
-

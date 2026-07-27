@@ -1,7 +1,7 @@
 """
-Face Detection Module — Detects faces using OpenCV's DNN-based YuNet model.
+Face Detection Module — Detects faces using OpenCV's DNN-based YuNet model with image quality checks.
 
-YuNet is highly accurate and provides 5 facial landmarks needed for SFace alignment.
+YuNet provides 5 facial landmarks needed for SFace alignment. Includes blur, brightness, and resolution quality metrics.
 """
 
 try:
@@ -24,6 +24,7 @@ YUNET_MODEL_PATH = os.path.join(base_dir, 'face_detection_yunet.onnx')
 
 # Initialize YuNet detector
 _detector = None
+
 
 def _get_detector(input_size=(320, 320)):
     global _detector
@@ -85,27 +86,51 @@ def decode_base64_image(base64_string):
         return None
 
 
+def calculate_image_quality(frame):
+    """
+    Calculate brightness and blur quality metrics for camera input frame.
+    Returns dict: {'brightness': float, 'blur_var': float, 'is_dark': bool, 'is_blurry': bool}
+    """
+    if frame is None or not HAS_OPENCV or cv2 is None:
+        return {'brightness': 100.0, 'blur_var': 100.0, 'is_dark': False, 'is_blurry': False}
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    brightness = float(np.mean(gray))
+    blur_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+
+    is_dark = brightness < 35.0
+    is_blurry = blur_var < 30.0
+
+    return {
+        'brightness': round(brightness, 1),
+        'blur_var': round(blur_var, 1),
+        'is_dark': is_dark,
+        'is_blurry': is_blurry
+    }
+
+
 def detect_face(frame):
     """
-    Detect faces using YuNet.
-
-    Args:
-        frame: BGR numpy array (from OpenCV or decoded base64)
+    Detect faces using YuNet with lighting and blur quality checks.
 
     Returns:
         tuple: (success, face_data, message)
-            - success: bool
-            - face_data: raw face data from YuNet including box and 5 landmarks (if single face detected, list of length 1)
-            - message: str
     """
     if frame is None:
         return False, [], "Invalid or empty camera frame."
+
+    # Perform Image Quality Checks
+    quality = calculate_image_quality(frame)
+    if quality['is_dark']:
+        return False, [], "Lighting is too dark. Please move to a brighter environment."
+    if quality['is_blurry']:
+        return False, [], "Camera image is blurry. Please hold your camera steady."
 
     h, w, _ = frame.shape
     detector = _get_detector((w, h))
 
     if detector is None:
-        # Robust fallback face region detection (center crop box with estimated 5 landmarks)
+        # Fallback crop box
         box_w = int(w * 0.5)
         box_h = int(h * 0.6)
         x = int((w - box_w) / 2)
@@ -120,7 +145,6 @@ def detect_face(frame):
         ], dtype=np.float32)
         return True, [fallback_face], "Face detected successfully."
 
-    # YuNet expects BGR format
     _, faces = detector.detect(frame)
 
     if faces is None or len(faces) == 0:
@@ -129,7 +153,6 @@ def detect_face(frame):
     if len(faces) > 1:
         return False, faces, "Multiple faces detected. Please ensure only one person is in frame."
 
-    # Check bounding box dimensions
     face = faces[0]
     box_w = face[2]
     box_h = face[3]
@@ -141,15 +164,12 @@ def detect_face(frame):
 
 
 def crop_face(frame, face_data, margin=40):
-    """
-    Crop the face based on the detected bounding box.
-    """
+    """Crop face bounding box."""
     if len(face_data) == 0:
         return frame
         
     face = face_data[0]
     x, y, w, h = map(int, face[:4])
-    
     img_h, img_w = frame.shape[:2]
     
     top = max(0, y - margin)
@@ -161,14 +181,13 @@ def crop_face(frame, face_data, margin=40):
 
 
 def draw_face_box(frame, face_data, color=(108, 99, 255), thickness=2):
-    """
-    Draw bounding boxes and landmarks.
-    """
+    """Draw bounding boxes and 5 landmarks on frame."""
+    if not HAS_OPENCV or cv2 is None or frame is None:
+        return frame
     annotated = frame.copy()
     
     for face in face_data:
         x, y, w, h = map(int, face[:4])
-        
         corner_length = 20
 
         # Corners
@@ -181,11 +200,11 @@ def draw_face_box(frame, face_data, color=(108, 99, 255), thickness=2):
         cv2.line(annotated, (x + w, y + h), (x + w - corner_length, y + h), color, thickness + 1)
         cv2.line(annotated, (x + w, y + h), (x + w, y + h - corner_length), color, thickness + 1)
         
-        # Draw 5 landmarks
-        cv2.circle(annotated, (int(face[4]), int(face[5])), 2, (255, 0, 0), 2)  # Right eye
-        cv2.circle(annotated, (int(face[6]), int(face[7])), 2, (0, 0, 255), 2)  # Left eye
-        cv2.circle(annotated, (int(face[8]), int(face[9])), 2, (0, 255, 0), 2)  # Nose
-        cv2.circle(annotated, (int(face[10]), int(face[11])), 2, (255, 0, 255), 2)  # Right mouth corner
-        cv2.circle(annotated, (int(face[12]), int(face[13])), 2, (0, 255, 255), 2)  # Left mouth corner
+        # 5 Landmarks
+        cv2.circle(annotated, (int(face[4]), int(face[5])), 2, (255, 0, 0), 2)
+        cv2.circle(annotated, (int(face[6]), int(face[7])), 2, (0, 0, 255), 2)
+        cv2.circle(annotated, (int(face[8]), int(face[9])), 2, (0, 255, 0), 2)
+        cv2.circle(annotated, (int(face[10]), int(face[11])), 2, (255, 0, 255), 2)
+        cv2.circle(annotated, (int(face[12]), int(face[13])), 2, (0, 255, 255), 2)
 
     return annotated

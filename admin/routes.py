@@ -449,4 +449,78 @@ def change_password():
     return redirect(url_for('admin.admin_settings'))
 
 
+@admin_bp.route('/audit-logs')
+@admin_required
+def audit_logs():
+    """View system security audit logs."""
+    db = get_db()
+    category = request.args.get('category', None)
+    logs = db.get_audit_logs(limit=100, category=category)
+    return render_template('admin/logs.html', logs=logs, is_audit_page=True, current_category=category)
 
+
+@admin_bp.route('/export/users')
+@admin_required
+def export_users_csv():
+    """Export registered users as CSV file."""
+    import csv
+    import io
+    from flask import Response
+
+    db = get_db()
+    users = db.get_all_users(limit=1000)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['User ID', 'Name', 'Email', 'Active Status', 'Role', 'Created At', 'Last Login'])
+
+    for u in users:
+        writer.writerow([
+            u.get('user_id'),
+            u.get('name'),
+            u.get('email'),
+            'Active' if u.get('is_active') else 'Disabled',
+            u.get('role', 'user'),
+            u.get('created_at'),
+            u.get('last_login', 'Never')
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment;filename=registered_users.csv'}
+    )
+
+
+@admin_bp.route('/export/logs')
+@admin_required
+def export_logs_csv():
+    """Export login access logs as CSV file."""
+    import csv
+    import io
+    from flask import Response
+
+    db = get_db()
+    logs = db.get_login_logs(limit=1000)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Log ID', 'User Name', 'Email', 'Status', 'Gesture', 'Gesture Result', 'IP Address', 'Login Time'])
+
+    for l in logs:
+        writer.writerow([
+            l.get('log_id'),
+            l.get('user_name', 'Unknown'),
+            l.get('user_email', 'N/A'),
+            l.get('status'),
+            l.get('gesture_type', 'None'),
+            l.get('gesture_result', 'N/A'),
+            l.get('ip_address', 'N/A'),
+            l.get('login_time')
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment;filename=login_access_logs.csv'}
+    )
