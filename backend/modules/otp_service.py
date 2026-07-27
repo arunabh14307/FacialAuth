@@ -1,6 +1,7 @@
 """
 OTP & Email Delivery Engine — Multi-protocol SMTP & HTTP API Mail Dispatcher.
-Includes full SMTP diagnostic logging for DNS resolution (IPv4 & IPv6), connection methods, and un-truncated tracebacks.
+Includes forced IPv4 socket resolution (AF_INET) for cloud container compatibility (Render/AWS/GCP),
+DNS resolution diagnostics, and un-truncated tracebacks.
 """
 
 import random
@@ -157,85 +158,90 @@ FaceGuard Security Team
 
     last_error_details = "Unknown connection error"
 
-    for p in ports_to_try:
-        conn_method = "SMTP_SSL" if p == 465 else "STARTTLS"
+    # Force socket.getaddrinfo to resolve IPv4 (AF_INET) only to bypass container IPv6 network unreachable errors on cloud platforms like Render
+    orig_getaddrinfo = socket.getaddrinfo
+    try:
+        socket.getaddrinfo = lambda host, port, family=0, type=0, proto=0, flags=0: \
+            orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
 
-        # DNS Resolution Diagnostic (IPv4 & IPv6)
-        ipv4_addrs = []
-        ipv6_addrs = []
-        try:
-            dns_info = socket.getaddrinfo(smtp_server, p, socket.AF_UNSPEC, socket.SOCK_STREAM)
-            for res in dns_info:
-                family = res[0]
-                ip = res[4][0]
-                if family == socket.AF_INET and ip not in ipv4_addrs:
-                    ipv4_addrs.append(ip)
-                elif family == socket.AF_INET6 and ip not in ipv6_addrs:
-                    ipv6_addrs.append(ip)
-        except Exception as dns_e:
-            logger.warning(f"[SMTP DNS DIAGNOSTIC WARNING] Resolution failed for {smtp_server}:{p} — {dns_e}")
+        for p in ports_to_try:
+            conn_method = "SMTP_SSL" if p == 465 else "STARTTLS"
 
-        diag_header = (
-            f"[SMTP DIAGNOSTIC]\n"
-            f"  - Server: {smtp_server}\n"
-            f"  - Port: {p}\n"
-            f"  - Connection Method: {conn_method}\n"
-            f"  - Resolved IPv4: {ipv4_addrs if ipv4_addrs else 'None'}\n"
-            f"  - Resolved IPv6: {ipv6_addrs if ipv6_addrs else 'None'}"
-        )
-        print(diag_header)
-        logger.info(diag_header)
+            # DNS Resolution Diagnostic (IPv4)
+            ipv4_addrs = []
+            try:
+                dns_info = orig_getaddrinfo(smtp_server, p, socket.AF_INET, socket.SOCK_STREAM)
+                for res in dns_info:
+                    ip = res[4][0]
+                    if ip not in ipv4_addrs:
+                        ipv4_addrs.append(ip)
+            except Exception as dns_e:
+                logger.warning(f"[SMTP DNS DIAGNOSTIC WARNING] Resolution failed for {smtp_server}:{p} — {dns_e}")
 
-        try:
-            print(f"[SMTP CONNECTING] Connecting to {smtp_server}:{p} ({conn_method})...")
-            logger.info(f"[SMTP CONNECTING] Connecting to {smtp_server}:{p} ({conn_method})")
-
-            if p == 465:
-                # SSL Connection for Port 465
-                server = smtplib.SMTP_SSL(smtp_server, 465, timeout=15)
-            else:
-                # Standard Connection with STARTTLS for Port 587
-                server = smtplib.SMTP(smtp_server, p, timeout=15)
-                print(f"[SMTP STARTTLS] Initiating STARTTLS handshake on {smtp_server}:{p}...")
-                logger.info(f"[SMTP STARTTLS] Initiating STARTTLS on {smtp_server}:{p}")
-                server.starttls()
-
-            print(f"[SMTP AUTHENTICATING] Authenticating user '{username}' on {smtp_server}:{p}...")
-            logger.info(f"[SMTP AUTHENTICATING] Authenticating {username} on port {p}")
-            server.login(username, password)
-
-            print(f"[SMTP SENDING] Dispatching mail from {mail_from} to {recipient_email}...")
-            logger.info(f"[SMTP SENDING] Sending from {mail_from} to {recipient_email}")
-            server.sendmail(mail_from, [recipient_email], msg.as_string())
-            server.quit()
-
-            success_msg = f"OTP email delivered successfully to {recipient_email} via SMTP ({smtp_server}:{p})"
-            print(f"[SMTP SUCCESS] {success_msg}")
-            logger.info(f"[SMTP SUCCESS] {success_msg}")
-            log_security_event("OTP_EMAIL_SENT", f"Recipient: {recipient_email} via {smtp_server}:{p}")
-            return True, success_msg
-
-        except smtplib.SMTPAuthenticationError as e:
-            full_tb = traceback.format_exc()
-            err_text = e.smtp_error.decode() if isinstance(e.smtp_error, bytes) else str(e.smtp_error)
-            last_error_details = f"SMTP Authentication Error ({e.smtp_code}): {err_text}"
-            diag_err = (
-                f"[SMTP FAILURE DIAGNOSTIC] Authentication failed on {smtp_server}:{p}\n"
-                f"Full Traceback:\n{full_tb}"
+            diag_header = (
+                f"[SMTP DIAGNOSTIC]\n"
+                f"  - Server: {smtp_server}\n"
+                f"  - Port: {p}\n"
+                f"  - Connection Method: {conn_method}\n"
+                f"  - Forced Address Family: IPv4 (AF_INET)\n"
+                f"  - Resolved IPv4 Addresses: {ipv4_addrs if ipv4_addrs else 'None'}"
             )
-            print(diag_err)
-            logger.error(diag_err)
-            break
+            print(diag_header)
+            logger.info(diag_header)
 
-        except Exception as e:
-            full_tb = traceback.format_exc()
-            last_error_details = f"{type(e).__name__}: {str(e)}"
-            diag_err = (
-                f"[SMTP FAILURE DIAGNOSTIC] Port {p} ({conn_method}) failed on {smtp_server}:\n"
-                f"Full Traceback:\n{full_tb}"
-            )
-            print(diag_err)
-            logger.error(diag_err)
+            try:
+                print(f"[SMTP CONNECTING] Connecting to {smtp_server}:{p} ({conn_method}) via IPv4...")
+                logger.info(f"[SMTP CONNECTING] Connecting to {smtp_server}:{p} ({conn_method}) via IPv4")
+
+                if p == 465:
+                    # SSL Connection for Port 465
+                    server = smtplib.SMTP_SSL(smtp_server, 465, timeout=15)
+                else:
+                    # Standard Connection with STARTTLS for Port 587
+                    server = smtplib.SMTP(smtp_server, p, timeout=15)
+                    print(f"[SMTP STARTTLS] Initiating STARTTLS handshake on {smtp_server}:{p}...")
+                    logger.info(f"[SMTP STARTTLS] Initiating STARTTLS on {smtp_server}:{p}")
+                    server.starttls()
+
+                print(f"[SMTP AUTHENTICATING] Authenticating user '{username}' on {smtp_server}:{p}...")
+                logger.info(f"[SMTP AUTHENTICATING] Authenticating {username} on port {p}")
+                server.login(username, password)
+
+                print(f"[SMTP SENDING] Dispatching mail from {mail_from} to {recipient_email}...")
+                logger.info(f"[SMTP SENDING] Sending from {mail_from} to {recipient_email}")
+                server.sendmail(mail_from, [recipient_email], msg.as_string())
+                server.quit()
+
+                success_msg = f"OTP email delivered successfully to {recipient_email} via SMTP ({smtp_server}:{p})"
+                print(f"[SMTP SUCCESS] {success_msg}")
+                logger.info(f"[SMTP SUCCESS] {success_msg}")
+                log_security_event("OTP_EMAIL_SENT", f"Recipient: {recipient_email} via {smtp_server}:{p}")
+                return True, success_msg
+
+            except smtplib.SMTPAuthenticationError as e:
+                full_tb = traceback.format_exc()
+                err_text = e.smtp_error.decode() if isinstance(e.smtp_error, bytes) else str(e.smtp_error)
+                last_error_details = f"SMTP Authentication Error ({e.smtp_code}): {err_text}"
+                diag_err = (
+                    f"[SMTP FAILURE DIAGNOSTIC] Authentication failed on {smtp_server}:{p}\n"
+                    f"Full Traceback:\n{full_tb}"
+                )
+                print(diag_err)
+                logger.error(diag_err)
+                break
+
+            except Exception as e:
+                full_tb = traceback.format_exc()
+                last_error_details = f"{type(e).__name__}: {str(e)}"
+                diag_err = (
+                    f"[SMTP FAILURE DIAGNOSTIC] Port {p} ({conn_method}) failed on {smtp_server}:\n"
+                    f"Full Traceback:\n{full_tb}"
+                )
+                print(diag_err)
+                logger.error(diag_err)
+
+    finally:
+        socket.getaddrinfo = orig_getaddrinfo
 
     final_err = f"SMTP delivery failed: {last_error_details}"
     print(f"[SMTP ERROR] {final_err}")
